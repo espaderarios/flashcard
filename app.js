@@ -12,6 +12,132 @@ if (window.currentTheme) applyThemePreset(window.currentTheme);
 })();
 
 const TEACHER_DRAFT_KEY = "teacher_quiz_draft";
+const STUDENT_PROFILE_KEY = "student_profile";
+const STUDENT_CLASSES_KEY = "student_enrolled_classes";
+const TEACHER_CLASSES_KEY = "teacher_classes";
+const CLASS_QUIZZES_KEY = "class_quizzes";
+
+// ============= STORAGE FUNCTIONS FOR NEW FEATURES =============
+
+// Student Profile Storage
+function saveStudentProfile(profileData) {
+  const profile = {
+    ...window.currentStudent,
+    ...profileData,
+    updatedAt: new Date().toISOString()
+  };
+  localStorage.setItem(STUDENT_PROFILE_KEY, JSON.stringify(profile));
+  window.currentStudent = profile;
+  return profile;
+}
+
+function getStudentProfile() {
+  const profile = JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "null");
+  return profile || window.currentStudent || {};
+}
+
+// Class Storage
+function saveClass(classData) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const classId = classData.id || `class_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  const classObj = {
+    ...classData,
+    id: classId,
+    createdAt: classData.createdAt || new Date().toISOString(),
+  };
+  
+  const existingIndex = classes.findIndex(c => c.id === classId);
+  if (existingIndex >= 0) {
+    classes[existingIndex] = classObj;
+  } else {
+    classes.push(classObj);
+  }
+  
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(classes));
+  return classObj;
+}
+
+function getTeacherClasses(teacherId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  return classes.filter(c => c.teacherId === teacherId);
+}
+
+function getClassById(classId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  return classes.find(c => c.id === classId);
+}
+
+function deleteClass(classId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const filtered = classes.filter(c => c.id !== classId);
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
+}
+
+// Student Class Enrollment
+function enrollStudentInClass(classCode) {
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  
+  const classToEnroll = allClasses.find(c => c.classCode === classCode);
+  if (!classToEnroll) {
+    return { success: false, error: "Invalid class code" };
+  }
+  
+  const studentId = window.currentStudent?.id || localStorage.getItem('currentStudentId');
+  if (!studentId) {
+    return { success: false, error: "Student ID not found" };
+  }
+  
+  const alreadyEnrolled = enrolledClasses.find(e => e.classId === classToEnroll.id && e.studentId === studentId);
+  if (alreadyEnrolled) {
+    return { success: false, error: "Already enrolled in this class" };
+  }
+  
+  enrolledClasses.push({
+    classId: classToEnroll.id,
+    className: classToEnroll.name,
+    teacherId: classToEnroll.teacherId,
+    studentId: studentId,
+    enrolledAt: new Date().toISOString()
+  });
+  
+  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(enrolledClasses));
+  return { success: true, classId: classToEnroll.id };
+}
+
+function getStudentEnrolledClasses(studentId) {
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  // Filter by studentId and fix old enrollments that don't have studentId
+  return enrolledClasses.filter(e => !e.studentId || e.studentId === studentId);
+}
+
+// Fix old enrollments that don't have studentId by removing them (clean data)
+function cleanOldEnrollments() {
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  const cleanedClasses = enrolledClasses.filter(e => e.studentId); // Keep only enrollments with studentId
+  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(cleanedClasses));
+}
+
+function getClassQuizzes(classId) {
+  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  return allQuizzes.filter(q => q.classId === classId);
+}
+
+function saveClassQuiz(quizData) {
+  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const quizId = quizData.id || `classquiz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  const quiz = {
+    ...quizData,
+    id: quizId,
+    createdAt: quizData.createdAt || new Date().toISOString(),
+  };
+  
+  allQuizzes.push(quiz);
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(allQuizzes));
+  return quiz;
+}
 
 function shuffleArray(array) {
   return array
@@ -2777,7 +2903,7 @@ function renderStudentView() {
 </div>
 
       <!-- Student Tabs -->
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
         <button
           class="px-4 py-2 rounded-lg transition-colors duration-200"
           style="
@@ -2797,13 +2923,25 @@ function renderStudentView() {
         >
           Profile
         </button>
+
+        <button
+          class="px-4 py-2 rounded-lg transition-colors duration-200"
+          style="
+            background-color: ${studentTab === 'classes' ? 'var(--primary)' : 'var(--surface)'}; 
+            color: ${studentTab === 'classes' ? 'var(--on-primary)' : 'var(--on-surface)'};"
+          onclick="studentTab='classes'; renderApp()"
+        >
+          Classes
+        </button>
       </div>
 
       <!-- Content -->
       <div class="w-full max-w-xl">
         ${studentTab === 'main'
           ? renderJoinQuiz()
-          : renderStudentProfile()}
+          : studentTab === 'profile'
+          ? renderEnhancedStudentProfile()
+          : renderStudentClassesView()}
       </div>
 
     </div>
@@ -3041,6 +3179,390 @@ function backStudentBtn() {
   renderApp();         
 }
 
+// ============= ENHANCED STUDENT PROFILE WITH GOOGLE AUTH & PICTURE =============
+
+function renderEnhancedStudentProfile() {
+  const profile = getStudentProfile();
+
+  return `
+    <div class="p-6 rounded-xl shadow space-y-6 mx-auto"
+         style="background-color: var(--surface); color: var(--on-surface);">
+      <h2 class="text-2xl font-bold text-center">My Profile</h2>
+
+      <!-- Profile Picture Section -->
+      <div class="flex flex-col items-center space-y-4">
+        <div class="w-24 h-24 rounded-full overflow-hidden border-4" 
+             style="border-color: var(--primary); background-color: var(--input-bg);">
+          ${profile.profilePictureUrl 
+            ? `<img src="${profile.profilePictureUrl}" class="w-full h-full object-cover" alt="Profile">`
+            : `<div class="w-full h-full flex items-center justify-center text-3xl">👤</div>`}
+        </div>
+        
+        <div class="flex gap-2">
+          <button class="px-4 py-2 rounded transition-colors duration-200 text-sm"
+                  style="background-color: var(--primary); color: var(--on-primary);"
+                  onclick="document.getElementById('profile-pic-input').click()">
+            Upload Picture
+          </button>
+          ${profile.profilePictureUrl ? `
+          <button class="px-4 py-2 rounded transition-colors duration-200 text-sm"
+                  style="background-color: var(--error); color: var(--on-error);"
+                  onclick="removeProfilePicture()">
+            Remove
+          </button>` : ''}
+        </div>
+        
+        <input type="file" id="profile-pic-input" class="hidden" accept="image/*"
+               onchange="handleProfilePictureUpload(this.files[0])">
+      </div>
+
+      <!-- Basic Info -->
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Full Name</label>
+          <input id="profile-name"
+                 class="w-full p-2 border rounded"
+                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
+                 value="${profile.name || ''}" placeholder="Enter your name">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">Student ID</label>
+          <input id="profile-student-id"
+                 class="w-full p-2 border rounded"
+                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
+                 value="${profile.id || ''}" placeholder="Enter your student ID">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">Email</label>
+          <input id="profile-email" type="email"
+                 class="w-full p-2 border rounded"
+                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
+                 value="${profile.email || ''}" placeholder="your.email@example.com">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">School/Institution</label>
+          <input id="profile-school"
+                 class="w-full p-2 border rounded"
+                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
+                 value="${profile.school || ''}" placeholder="Your school or institution">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">Grade/Level</label>
+          <input id="profile-grade"
+                 class="w-full p-2 border rounded"
+                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
+                 value="${profile.grade || ''}" placeholder="e.g., 10th Grade, University">
+        </div>
+      </div>
+
+      <!-- Google Account Integration -->
+      <div class="border-t pt-4" style="border-color: var(--border);">
+        <h3 class="font-semibold mb-3">Connected Accounts</h3>
+        
+        ${profile.googleId 
+          ? `<div class="flex items-center justify-between p-3 rounded"
+                  style="background-color: var(--input-bg);">
+              <div class="flex items-center gap-2">
+                <span>🔗 Google Account</span>
+                <span class="text-sm">${profile.googleEmail || 'Connected'}</span>
+              </div>
+              <button class="text-sm px-2 py-1 rounded transition-colors"
+                      style="background-color: var(--error); color: var(--on-error);"
+                      onclick="disconnectGoogle()">
+                Disconnect
+              </button>
+            </div>`
+          : `<button class="w-full px-4 py-2 rounded transition-colors flex items-center justify-center gap-2"
+                   style="background-color: #4285F4; color: white;"
+                   onclick="connectGoogle()">
+              <span>🔗</span> Connect Google Account
+            </button>`}
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3 pt-4">
+        <button class="flex-1 px-4 py-2 rounded transition-colors duration-200 font-semibold"
+                style="background-color: var(--primary); color: var(--on-primary);"
+                onclick="saveEnhancedProfile()">
+          Save Profile
+        </button>
+
+        <button class="flex-1 px-4 py-2 rounded transition-colors duration-200"
+                style="background-color: var(--surface-variant); color: var(--on-surface);"
+                onclick="studentTab='main'; renderApp()">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function handleProfilePictureUpload(file) {
+  if (!file) return;
+  
+  // Check file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    toast('File size must be less than 5MB');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const pictureUrl = e.target.result;
+    const profile = getStudentProfile();
+    profile.profilePictureUrl = pictureUrl;
+    saveStudentProfile(profile);
+    renderApp();
+    toast('✅ Profile picture uploaded');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeProfilePicture() {
+  const profile = getStudentProfile();
+  profile.profilePictureUrl = null;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('Profile picture removed');
+}
+
+function connectGoogle() {
+  // Note: For production, implement proper OAuth2 flow with Google
+  // For now, show a demo setup
+  const email = prompt('Enter your Google email:');
+  if (!email) return;
+  
+  const profile = getStudentProfile();
+  profile.googleId = `google_${Date.now()}`;
+  profile.googleEmail = email;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('✅ Google account connected');
+}
+
+function disconnectGoogle() {
+  if (!confirm('Are you sure you want to disconnect your Google account?')) return;
+  
+  const profile = getStudentProfile();
+  profile.googleId = null;
+  profile.googleEmail = null;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('Google account disconnected');
+}
+
+function saveEnhancedProfile() {
+  const name = document.getElementById('profile-name').value.trim();
+  const studentId = document.getElementById('profile-student-id').value.trim();
+  const email = document.getElementById('profile-email').value.trim();
+  const school = document.getElementById('profile-school').value.trim();
+  const grade = document.getElementById('profile-grade').value.trim();
+  
+  if (!name || !studentId) {
+    toast('❌ Name and Student ID are required');
+    return;
+  }
+  
+  const profile = getStudentProfile();
+  profile.name = name;
+  profile.id = studentId;
+  profile.email = email;
+  profile.school = school;
+  profile.grade = grade;
+  
+  saveStudentProfile(profile);
+  window.currentStudent = profile;
+  localStorage.setItem('currentStudent', JSON.stringify(profile));
+  
+  renderApp();
+  toast('✅ Profile saved successfully');
+}
+
+// ============= STUDENT CLASSES VIEW =============
+
+function renderStudentClassesView() {
+  const studentId = window.currentStudent?.id;
+  if (!studentId) {
+    return `<div class="p-6 text-center" style="color: var(--on-surface);">
+      Please create an account first to enroll in classes.
+    </div>`;
+  }
+  
+  const enrolledClasses = getStudentEnrolledClasses(studentId);
+
+  return `
+    <div class="space-y-6">
+      <!-- Enroll Section -->
+      <div class="p-6 rounded-xl shadow space-y-4"
+           style="background-color: var(--surface); color: var(--on-surface);">
+        <h3 class="text-lg font-bold">Enroll in a Class</h3>
+        
+        <div class="flex gap-2">
+          <input id="class-code-input" type="text"
+                 placeholder="Enter class code"
+                 class="flex-1 p-2 border rounded"
+                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
+                 onkeypress="if(event.key === 'Enter') enrollInClass()">
+          <button class="px-4 py-2 rounded transition-colors"
+                  style="background-color: var(--primary); color: var(--on-primary);"
+                  onclick="enrollInClass()">
+            Enroll
+          </button>
+        </div>
+        <p class="text-xs" style="color: var(--on-surface-variant);">
+          Ask your teacher for the class code
+        </p>
+      </div>
+
+      <!-- Enrolled Classes -->
+      <div class="space-y-3">
+        <h3 class="text-lg font-bold" style="color: var(--on-surface);">My Classes</h3>
+        
+        ${enrolledClasses.length === 0
+          ? `<div class="p-6 text-center rounded-xl"
+                 style="background-color: var(--surface-variant); color: var(--on-surface-variant);">
+              You haven't enrolled in any classes yet.
+            </div>`
+          : enrolledClasses.map(enrollment => {
+              const classQuizzes = getClassQuizzes(enrollment.classId);
+              return `
+              <div class="p-6 rounded-xl shadow space-y-4"
+                   style="background-color: var(--surface); color: var(--on-surface);">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h4 class="text-xl font-bold">${enrollment.className}</h4>
+                    <p class="text-sm" style="color: var(--on-surface-variant);">
+                      Enrolled: ${new Date(enrollment.enrolledAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button class="px-3 py-1 text-sm rounded transition-colors"
+                          style="background-color: var(--error); color: var(--on-error);"
+                          onclick="unenrollFromClass('${enrollment.classId}')">
+                    Unenroll
+                  </button>
+                </div>
+                
+                <!-- Quizzes in Class -->
+                <div class="mt-4 pt-4 border-t" style="border-color: var(--border);">
+                  <p class="text-sm font-semibold mb-3">📋 Class Quizzes (${classQuizzes.length})</p>
+                  ${classQuizzes.length === 0
+                    ? `<p class="text-xs" style="color: var(--on-surface-variant);">No quizzes yet</p>`
+                    : classQuizzes.map(quiz => {
+                      const attempts = getStudentQuizAttempts(studentId, quiz.id);
+                      const attemptLimit = getQuizAttemptLimit(enrollment.classId, quiz.id);
+                      const bestScore = attempts.length > 0 ? Math.max(...attempts.map(a => a.percentage)) : null;
+                      const bestGrade = bestScore !== null ? getLetterGrade(bestScore) : null;
+                      const canRetake = attempts.length < attemptLimit;
+                      
+                      return `
+                      <div class="mb-3 p-3 rounded"
+                           style="background-color: var(--input-bg); border-left: 4px solid ${bestGrade ? getGradeColor(bestGrade) : 'var(--border)'};">
+                        <div class="flex justify-between items-start">
+                          <div class="flex-1">
+                            <p class="font-semibold">${quiz.title}</p>
+                            <p class="text-xs" style="color: var(--on-surface-variant);">
+                              Questions: ${quiz.questions?.length || 0}
+                              ${quiz.timeLimit ? ` | Time: ${quiz.timeLimit} min` : ''}
+                            </p>
+                            <div style="margin-top: 8px; display: flex; gap: 8px; font-size: 12px;">
+                              <span style="background: var(--surface); padding: 2px 6px; border-radius: 3px;">
+                                Attempts: ${attempts.length}/${attemptLimit}
+                              </span>
+                              ${bestScore !== null ? `
+                                <span style="background: ${getGradeColor(bestGrade)}; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">
+                                  Grade: ${bestGrade} (${bestScore}%)
+                                </span>
+                              ` : ''}
+                            </div>
+                            ${quiz.dueDate ? `
+                              <p class="text-xs mt-1" style="color: ${new Date(quiz.dueDate) < new Date() ? 'var(--error)' : 'var(--primary)'};">
+                                Due: ${new Date(quiz.dueDate).toLocaleDateString()}
+                              </p>
+                            ` : ''}
+                          </div>
+                          <button class="px-3 py-1 text-sm rounded transition-colors"
+                                  style="background-color: ${canRetake ? 'var(--primary)' : 'var(--surface-variant)'}; color: var(--on-primary); cursor: ${canRetake ? 'pointer' : 'not-allowed'}; opacity: ${canRetake ? '1' : '0.5'};"
+                                  onclick="${canRetake ? `startClassQuiz('${quiz.id}')` : 'toast("❌ Maximum attempts reached")'}"
+                                  ${canRetake ? '' : 'disabled'}>
+                            ${attempts.length === 0 ? 'Start' : 'Retake'}
+                          </button>
+                        </div>
+                      </div>
+                    `;
+                    }).join('')}
+                </div>
+              </div>`;
+            }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function enrollInClass() {
+  const classCode = document.getElementById('class-code-input').value.trim().toUpperCase();
+  
+  if (!classCode) {
+    toast('❌ Please enter a class code');
+    return;
+  }
+  
+  const result = enrollStudentInClass(classCode);
+  
+  if (result.success) {
+    document.getElementById('class-code-input').value = '';
+    renderApp();
+    toast('✅ Successfully enrolled in class!');
+  } else {
+    toast('❌ ' + result.error);
+  }
+}
+
+function unenrollFromClass(classId) {
+  if (!confirm('Are you sure you want to unenroll from this class?')) return;
+  
+  const enrolledClasses = getStudentEnrolledClasses();
+  const filtered = enrolledClasses.filter(e => e.classId !== classId);
+  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(filtered));
+  
+  renderApp();
+  toast('Unenrolled from class');
+}
+
+function startClassQuiz(quizId) {
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const quiz = classQuizzes.find(q => q.id === quizId);
+  
+  if (!quiz) {
+    toast('Quiz not found');
+    return;
+  }
+  
+  // Check attempt limit
+  const studentId = window.currentStudent?.id;
+  const classId = quiz.classId;
+  const attemptLimit = getQuizAttemptLimit(classId, quizId);
+  const attempts = getStudentQuizAttempts(studentId, quizId);
+  
+  if (attempts.length >= attemptLimit) {
+    toast(`❌ You have reached the maximum of ${attemptLimit} attempt(s) for this quiz`);
+    return;
+  }
+  
+  // Check if quiz has time limit
+  if (quiz.timeLimit) {
+    window._quizTimeLimit = quiz.timeLimit * 60; // Convert to seconds
+  }
+  
+  window._classQuizId = quizId;
+  window._classQuiz = quiz;
+  currentView = 'class-quiz';
+  renderApp();
+}
+
 function renderTeacherView() {
   return `
    <div class="flex flex-col items-center mt-6 space-y-4 w-full" 
@@ -3055,7 +3577,7 @@ function renderTeacherView() {
     </button>
   </div>
       <!-- Teacher Tabs -->
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
         <button
           class="px-4 py-2 rounded-lg transition-colors duration-200"
           style="
@@ -3064,6 +3586,16 @@ function renderTeacherView() {
           onclick="teacherTab='main'; renderApp()"
         >
           Dashboard
+        </button>
+
+        <button
+          class="px-4 py-2 rounded-lg transition-colors duration-200"
+          style="
+            background-color: ${teacherTab === 'classes' ? 'var(--primary)' : 'var(--surface)'}; 
+            color: ${teacherTab === 'classes' ? 'var(--on-primary)' : 'var(--on-surface)'};"
+          onclick="teacherTab='classes'; renderApp()"
+        >
+          Classes
         </button>
 
         <button
@@ -3081,11 +3613,617 @@ function renderTeacherView() {
       <div class="mt-4">
         ${teacherTab === 'main'
           ? renderTeacherQuizList()
+          : teacherTab === 'classes'
+          ? renderTeacherClassesView()
           : renderTeacherProfile()}
       </div>
 
     </div>
   `;
+}
+
+function getLetterGrade(percentage) {
+  if (percentage >= 90) return 'A';
+  if (percentage >= 80) return 'B';
+  if (percentage >= 70) return 'C';
+  if (percentage >= 60) return 'D';
+  return 'F';
+}
+
+function getGradeColor(grade) {
+  switch(grade) {
+    case 'A': return '#22c55e'; // green
+    case 'B': return '#3b82f6'; // blue
+    case 'C': return '#f59e0b'; // orange
+    case 'D': return '#ef4444'; // red
+    case 'F': return '#7f1d1d'; // dark red
+    default: return 'var(--primary)';
+  }
+}
+
+function getStudentQuizAttempts(studentId, quizId) {
+  const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
+  return Object.values(scores).filter(s => s.studentId === studentId && s.quizId === quizId) || [];
+}
+
+function getQuizAttemptLimit(classId, quizId) {
+  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
+  const key = `${classId}_${quizId}`;
+  return limits[key] || 3; // Default 3 attempts
+}
+
+function setQuizAttemptLimit(classId, quizId, limit) {
+  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
+  const key = `${classId}_${quizId}`;
+  limits[key] = limit;
+  localStorage.setItem('quizAttemptLimits', JSON.stringify(limits));
+}
+
+function renderClassQuizSettings(classId) {
+  const classQuizzes = getClassQuizzes(classId);
+  
+  let html = '<div style="background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px;">';
+  html += '<h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Quiz Settings</h3>';
+  
+  if (classQuizzes.length === 0) {
+    html += '<p style="color: var(--on-surface-variant);">No quizzes assigned to this class yet.</p>';
+    html += '</div>';
+    return html;
+  }
+  
+  html += '<div style="max-height: 400px; overflow-y: auto;">';
+  classQuizzes.forEach(quiz => {
+    const limit = getQuizAttemptLimit(classId, quiz.id);
+    html += `
+      <div style="background: var(--input-bg); padding: 12px; border-radius: 6px; margin-bottom: 10px;">
+        <p style="font-weight: bold; margin-bottom: 8px;">${quiz.title}</p>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <label style="font-size: 14px;">Max Attempts:</label>
+          <input type="number" min="1" max="10" value="${limit}" 
+                 onchange="setQuizAttemptLimit('${classId}', '${quiz.id}', parseInt(this.value)); toast('✅ Attempt limit updated')"
+                 style="width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--on-surface);">
+        </div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  html += `<button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
+           onclick="document.querySelector('[data-settings-overlay]').remove(); teacherTab='classes'; renderApp()">Close</button>`;
+  html += '</div>';
+  
+  return html;
+}
+
+function openQuizSettingsModal(classId) {
+  const html = renderClassQuizSettings(classId);
+  
+  const overlay = document.createElement('div');
+  overlay.setAttribute('data-settings-overlay', 'true');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;';
+  overlay.innerHTML = `<div style="width: 90%; max-width: 500px;">${html}</div>`;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  document.body.appendChild(overlay);
+}
+
+function renderStudentScoresView(classId) {
+  // Clean up old enrollments without studentId
+  cleanOldEnrollments();
+  
+  const enrollments = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]")
+    .filter(e => e.classId === classId);
+  const classQuizzes = getClassQuizzes(classId);
+  const scoresData = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
+  
+  // Convert scores object to array for easier manipulation
+  const allScores = Object.values(scoresData);
+  
+  if (enrollments.length === 0) {
+    return `<div class="p-6 text-center" style="background: var(--surface); color: var(--on-surface-variant); border-radius: 8px;">
+      No students enrolled in this class yet.
+    </div>`;
+  }
+  
+  let html = '<div style="overflow-x: auto;">';
+  
+  enrollments.forEach(enrollment => {
+    html += `<div style="margin-bottom: 30px; padding: 15px; background: var(--input-bg); border-radius: 8px;">`;
+    html += `<h4 style="font-weight: bold; margin-bottom: 12px; color: var(--on-surface);">Student: ${enrollment.studentId}</h4>`;
+    html += '<table style="width: 100%; border-collapse: collapse;">';
+    html += '<thead>';
+    html += '<tr style="background: var(--surface); border-bottom: 2px solid var(--border);">';
+    html += '<th style="padding: 12px; text-align: left; font-weight: bold; color: var(--on-surface); width: 20%;">Quiz</th>';
+    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 12%;">Attempt</th>';
+    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 12%;">Score</th>';
+    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 12%;">Grade</th>';
+    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 22%;">Date</th>';
+    html += '</tr>';
+    html += '</thead>';
+    html += '<tbody>';
+    
+    // Get all scores for this student across all quizzes in this class
+    const studentScores = allScores.filter(s => s && s.studentId === enrollment.studentId);
+    
+    if (studentScores.length === 0) {
+      html += '<tr><td colspan="5" style="padding: 12px; text-align: center; color: var(--on-surface-variant);">No quiz attempts yet</td></tr>';
+    } else {
+      // Group scores by quiz and show all attempts
+      const scoresByQuiz = {};
+      studentScores.forEach(score => {
+        if (!scoresByQuiz[score.quizId]) {
+          scoresByQuiz[score.quizId] = [];
+        }
+        scoresByQuiz[score.quizId].push(score);
+      });
+      
+      classQuizzes.forEach(quiz => {
+        const quizAttempts = scoresByQuiz[quiz.id] || [];
+        
+        if (quizAttempts.length === 0) {
+          html += `<tr><td style="padding: 12px; color: var(--on-surface);">${quiz.title}</td>`;
+          html += '<td colspan="4" style="padding: 12px; text-align: center; color: var(--on-surface-variant);">Not attempted</td></tr>';
+        } else {
+          // Sort by date (oldest first)
+          quizAttempts.sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+          
+          quizAttempts.forEach((attempt, idx) => {
+            const grade = getLetterGrade(attempt.percentage || 0);
+            const gradeColor = getGradeColor(grade);
+            const date = new Date(attempt.completedAt);
+            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            html += `<tr style="border-bottom: 1px solid var(--border);">`;
+            if (idx === 0) {
+              html += `<td style="padding: 12px; color: var(--on-surface); font-weight: bold;">${quiz.title}</td>`;
+            } else {
+              html += `<td style="padding: 12px; color: var(--on-surface);"></td>`;
+            }
+            html += `<td style="padding: 12px; text-align: center; color: var(--on-surface);">${idx + 1}</td>`;
+            html += `<td style="padding: 12px; text-align: center; color: var(--on-surface);">${attempt.score}/${attempt.total}</td>`;
+            html += `<td style="padding: 12px; text-align: center;">
+              <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: ${gradeColor}; color: white; font-weight: bold;">
+                ${grade} (${attempt.percentage}%)
+              </span>
+            </td>`;
+            html += `<td style="padding: 12px; text-align: center; font-size: 12px; color: var(--on-surface-variant);">${dateStr}</td>`;
+            html += '</tr>';
+          });
+        }
+      });
+    }
+    
+    html += '</tbody>';
+    html += '</table>';
+    html += '</div>';
+  });
+  
+  html += '</div>';
+  
+  return html;
+}
+
+function openStudentScoresModal(classId) {
+  const html = renderStudentScoresView(classId);
+  
+  const overlay = document.createElement('div');
+  overlay.setAttribute('data-scores-overlay', 'true');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto;';
+  overlay.innerHTML = `<div style="width: 95%; max-width: 1200px; background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Student Quiz Attempts & Scores</h3>
+    ${html}
+    <button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold;"
+             onclick="document.querySelector('[data-scores-overlay]').remove()">Close</button>
+  </div>`;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  document.body.appendChild(overlay);
+}
+
+// ============= TEACHER CLASSES VIEW =============
+
+function renderTeacherClassesView() {
+  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
+  const teacherClasses = getTeacherClasses(teacherId);
+
+  return `
+    <div class="space-y-6 w-full">
+      <!-- Create New Class Section -->
+      <div class="p-6 rounded-xl shadow space-y-4"
+           style="background-color: var(--surface); color: var(--on-surface);">
+        <h3 class="text-lg font-bold">Create a New Class</h3>
+        
+        <div>
+          <label class="block text-sm font-semibold mb-1">Class Name</label>
+          <input id="new-class-name" type="text"
+                 placeholder="e.g., Physics 101 - Period 3"
+                 class="w-full p-2 border rounded"
+                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Subject</label>
+            <input id="new-class-subject" type="text"
+                   placeholder="e.g., Physics"
+                   class="w-full p-2 border rounded"
+                   style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Grade Level</label>
+            <input id="new-class-grade" type="text"
+                   placeholder="e.g., 10th Grade"
+                   class="w-full p-2 border rounded"
+                   style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">Description</label>
+          <textarea id="new-class-description"
+                    placeholder="Brief description of the class"
+                    class="w-full p-2 border rounded resize-none"
+                    style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
+                    rows="3"></textarea>
+        </div>
+
+        <button class="w-full px-4 py-2 rounded transition-colors font-semibold"
+                style="background-color: var(--primary); color: var(--on-primary);"
+                onclick="createNewClass()">
+          Create Class
+        </button>
+      </div>
+
+      <!-- Classes List -->
+      <div class="space-y-3">
+        <h3 class="text-lg font-bold" style="color: var(--on-surface);">My Classes</h3>
+        
+        ${teacherClasses.length === 0
+          ? `<div class="p-6 text-center rounded-xl"
+                 style="background-color: var(--surface-variant); color: var(--on-surface-variant);">
+              You haven't created any classes yet.
+            </div>`
+          : teacherClasses.map(cls => {
+              const classQuizzes = getClassQuizzes(cls.id);
+              const enrollments = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]")
+                .filter(e => e.classId === cls.id);
+              
+              return `
+              <div class="p-6 rounded-xl shadow space-y-4"
+                   style="background-color: var(--surface); color: var(--on-surface);">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h4 class="text-xl font-bold">${cls.name}</h4>
+                    <p class="text-sm" style="color: var(--on-surface-variant);">
+                      ${cls.subject || 'General'} • ${cls.grade || 'All Levels'}
+                    </p>
+                    ${cls.description ? `
+                      <p class="text-sm mt-1">${cls.description}</p>
+                    ` : ''}
+                  </div>
+                  <button class="px-3 py-1 text-sm rounded transition-colors"
+                          style="background-color: var(--error); color: var(--on-error);"
+                          onclick="deleteTeacherClass('${cls.id}')">
+                    Delete
+                  </button>
+                </div>
+
+                <!-- Class Code Section -->
+                <div class="p-3 rounded border-2"
+                     style="border-color: var(--primary); background-color: var(--input-bg);">
+                  <p class="text-xs font-semibold mb-1">Class Code (Share with Students)</p>
+                  <div class="flex gap-2 items-center">
+                    <code class="flex-1 p-2 rounded font-mono text-lg font-bold"
+                          style="background-color: var(--surface); color: var(--primary);">
+                      ${cls.classCode}
+                    </code>
+                    <button class="px-3 py-2 rounded text-sm transition-colors"
+                            style="background-color: var(--primary); color: var(--on-primary);"
+                            onclick="navigator.clipboard.writeText('${cls.classCode}'); toast('Code copied!')">
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Enrollments Section -->
+                <div class="pt-3 border-t" style="border-color: var(--border);">
+                  <div class="flex justify-between items-center mb-2">
+                    <p class="text-sm font-semibold">👥 Enrolled Students (${enrollments.length})</p>
+                    <button class="px-2 py-1 text-xs rounded transition-colors"
+                            style="background-color: var(--primary); color: var(--on-primary);"
+                            onclick="openStudentScoresModal('${cls.id}')">
+                      📊 View Scores
+                    </button>
+                  </div>
+                  ${enrollments.length === 0
+                    ? `<p class="text-xs" style="color: var(--on-surface-variant);">No students enrolled yet</p>`
+                    : `<div class="space-y-1">
+                        ${enrollments.slice(0, 3).map(e => `
+                          <div class="text-xs p-1 rounded" style="background-color: var(--input-bg);">
+                            Student ID: ${e.studentId}
+                          </div>
+                        `).join('')}
+                        ${enrollments.length > 3 ? `
+                          <p class="text-xs" style="color: var(--on-surface-variant);">
+                            +${enrollments.length - 3} more student(s)
+                          </p>
+                        ` : ''}
+                      </div>`}
+                </div>
+
+                <!-- Quizzes Section -->
+                <div class="pt-3 border-t" style="border-color: var(--border);">
+                  <div class="flex justify-between items-center mb-2">
+                    <p class="text-sm font-semibold">📋 Class Quizzes (${classQuizzes.length})</p>
+                    <div class="flex gap-1">
+                      <button class="px-2 py-1 text-xs rounded transition-colors"
+                              style="background-color: var(--primary); color: var(--on-primary);"
+                              onclick="openQuizSettingsModal('${cls.id}')">
+                        ⚙️ Settings
+                      </button>
+                      <button class="px-2 py-1 text-xs rounded transition-colors"
+                              style="background-color: var(--primary); color: var(--on-primary);"
+                              onclick="openAddQuizToClassModal('${cls.id}')">
+                        + Add Quiz
+                      </button>
+                    </div>
+                  </div>
+                  
+                  ${classQuizzes.length === 0
+                    ? `<p class="text-xs" style="color: var(--on-surface-variant);">No quizzes assigned yet</p>`
+                    : classQuizzes.map(quiz => `
+                      <div class="mb-2 p-3 rounded"
+                           style="background-color: var(--input-bg);">
+                        <div class="flex justify-between items-start">
+                          <div class="flex-1">
+                            <p class="font-semibold text-sm">${quiz.title}</p>
+                            <p class="text-xs" style="color: var(--on-surface-variant);">
+                              ${quiz.questions?.length || 0} questions
+                              ${quiz.timeLimit ? ` | ${quiz.timeLimit} min` : ''}
+                            </p>
+                          </div>
+                          <button class="px-2 py-1 text-xs rounded transition-colors"
+                                  style="background-color: var(--error); color: var(--on-error);"
+                                  onclick="removeQuizFromClass('${cls.id}', '${quiz.id}')">
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    `).join('')}
+                </div>
+              </div>`;
+            }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function createNewClass() {
+  const name = document.getElementById('new-class-name')?.value?.trim();
+  const subject = document.getElementById('new-class-subject')?.value?.trim();
+  const grade = document.getElementById('new-class-grade')?.value?.trim();
+  const description = document.getElementById('new-class-description')?.value?.trim();
+  
+  if (!name) {
+    toast('❌ Class name is required');
+    return;
+  }
+  
+  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
+  const classId = 'class_' + Date.now();
+  const classCode = generateClassCode();
+  
+  const newClass = {
+    id: classId,
+    name: name,
+    subject: subject || '',
+    grade: grade || '',
+    description: description || '',
+    classCode: classCode,
+    teacherId: teacherId,
+    createdAt: new Date().toISOString()
+  };
+  
+  saveClass(newClass);
+  
+  // Clear inputs
+  document.getElementById('new-class-name').value = '';
+  document.getElementById('new-class-subject').value = '';
+  document.getElementById('new-class-grade').value = '';
+  document.getElementById('new-class-description').value = '';
+  
+  renderApp();
+  toast('✅ Class created successfully!');
+}
+
+function generateClassCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  // Check if code already exists
+  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  if (allClasses.some(c => c.classCode === code)) {
+    return generateClassCode(); // Recursively generate if collision
+  }
+  
+  return code;
+}
+
+function deleteTeacherClass(classId) {
+  if (!confirm('Are you sure you want to delete this class? This action cannot be undone.')) return;
+  
+  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
+  const classes = getTeacherClasses(teacherId);
+  const filtered = classes.filter(c => c.id !== classId);
+  
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
+  
+  // Also remove associated quizzes
+  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const filteredQuizzes = allQuizzes.filter(q => q.classId !== classId);
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filteredQuizzes));
+  
+  renderApp();
+  toast('Class and associated quizzes deleted');
+}
+
+function openAddQuizToClassModal(classId) {
+  // Get all quizzes from localStorage
+  const quizzes = [];
+  
+  // Search through all localStorage keys for teacher quizzes
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(stored)) {
+          quizzes.push(...stored);
+        }
+      } catch (e) {
+        console.error('Error parsing quiz key:', key, e);
+      }
+    }
+  }
+  
+  if (quizzes.length === 0) {
+    toast('❌ You need to create quizzes first in the Dashboard');
+    return;
+  }
+  
+  // Show modal to select quiz
+  let html = '<div style="background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px;">';
+  html += '<h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Add Quiz to Class</h3>';
+  html += '<p style="font-size: 14px; margin-bottom: 15px; color: var(--on-surface-variant);">Select a quiz to add to this class:</p>';
+  html += '<div style="max-height: 400px; overflow-y: auto; space-y: 2;">';
+  
+  quizzes.forEach(quiz => {
+    html += `
+      <div style="background: var(--input-bg); padding: 10px; border-radius: 6px; margin-bottom: 10px; cursor: pointer;"
+           onclick="assignQuizToClass('${classId}', '${quiz.quizId || quiz.id}'); toast('✅ Quiz added to class')">
+        <p style="font-weight: bold;">${quiz.title || quiz.quizName || 'Untitled Quiz'}</p>
+        <p style="font-size: 12px; color: var(--on-surface-variant);">${quiz.questions?.length || 0} questions</p>
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  html += `<button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
+           onclick="document.querySelector('[data-modal-overlay]').remove(); teacherTab='classes'; renderApp()">Close</button>`;
+  html += '</div>';
+  
+  // Show as overlay
+  const overlay = document.createElement('div');
+  overlay.setAttribute('data-modal-overlay', 'true');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;';
+  overlay.innerHTML = `<div style="width: 90%; max-width: 500px;">${html}</div>`;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  document.body.appendChild(overlay);
+}
+
+function assignQuizToClass(classId, quizId) {
+  // Find quiz from all storage locations
+  let quiz = null;
+  
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(stored)) {
+          quiz = stored.find(q => q.quizId === quizId || q.id === quizId);
+          if (quiz) break;
+        }
+      } catch (e) {
+        console.error('Error parsing quiz key:', key, e);
+      }
+    }
+  }
+  
+  if (!quiz) {
+    toast('Quiz not found');
+    return;
+  }
+  
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  
+  // Check if already added
+  if (classQuizzes.some(cq => cq.classId === classId && cq.id === quizId)) {
+    toast('This quiz is already in the class');
+    return;
+  }
+  
+  // If quiz doesn't have questions locally, try to fetch from Cloudflare
+  let questions = quiz.questions || [];
+  
+  if (!questions || questions.length === 0) {
+    // Try to fetch from Cloudflare (async, but we'll save what we have)
+    toast('⏳ Fetching quiz details...');
+    
+    // Fetch from Cloudflare in background
+    (async () => {
+      try {
+        const cfData = await getQuizFromCloudflare(quizId);
+        if (cfData && cfData.questions) {
+          questions = cfData.questions;
+          
+          // Update the stored quiz with questions
+          const key = `teacher_quizzes_${getUser().id}`;
+          const stored = JSON.parse(localStorage.getItem(key) || '[]');
+          const idx = stored.findIndex(q => q.quizId === quizId);
+          if (idx >= 0) {
+            stored[idx].questions = questions;
+            localStorage.setItem(key, JSON.stringify(stored));
+          }
+          
+          // Update class quiz with questions
+          const classQuizzes2 = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+          const cqIdx = classQuizzes2.findIndex(cq => cq.classId === classId && cq.id === quizId);
+          if (cqIdx >= 0) {
+            classQuizzes2[cqIdx].questions = questions;
+            localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes2));
+          }
+          
+          toast('✅ Quiz added with ' + questions.length + ' questions!');
+          renderApp();
+        }
+      } catch (err) {
+        console.log('Could not fetch from Cloudflare, using local data');
+      }
+    })();
+  }
+  
+  const classQuiz = {
+    id: quizId,
+    classId: classId,
+    title: quiz.quizName || quiz.title || 'Untitled Quiz',
+    questions: questions,
+    timeLimit: null, // Can be set later
+    createdAt: new Date().toISOString()
+  };
+  
+  classQuizzes.push(classQuiz);
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes));
+  
+  teacherTab = 'classes';
+  renderApp();
+}
+
+function removeQuizFromClass(classId, quizId) {
+  if (!confirm('Remove this quiz from the class?')) return;
+  
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const filtered = classQuizzes.filter(q => !(q.classId === classId && q.id === quizId));
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filtered));
+  
+  renderApp();
+  toast('Quiz removed from class');
 }
 
 
@@ -3743,26 +4881,59 @@ function previewTeacherQuiz() {
 
 
 async function editTeacherQuiz(quizId) {
-  const res = await fetch(
-    `${getBackendUrl()}/api/quizzes/${quizId}`
-  );
+  try {
+    const res = await fetch(
+      `${getBackendUrl()}/api/quizzes/${quizId}`
+    );
 
-if (!res.ok) {
-  const err = await res.json();
-  toast(err.error || "Failed to update quiz");
-  return;
-}
+    if (!res.ok) {
+      throw new Error("Failed to fetch quiz");
+    }
 
-  const data = await res.json();
+    const data = await res.json();
 
-  clearTeacherDraft();
+    clearTeacherDraft();
 
-  window._teacherEditingQuizId = quizId;
-  window._teacherTitleDraft = data.quiz.title;
-  teacherQuestions = data.questions;
+    window._teacherEditingQuizId = quizId;
+    window._teacherTitleDraft = data.quiz.title;
+    teacherQuestions = data.questions || [];
 
-  currentView = "teacher";
-  renderApp();
+    currentView = "teacher";
+    renderApp();
+  } catch (err) {
+    // Fallback: load from localStorage
+    const user = getUser();
+    if (!user) {
+      toast("❌ Please log in first");
+      return;
+    }
+
+    const key = `teacher_quizzes_${user.id}`;
+    const quizzes = JSON.parse(localStorage.getItem(key) || "[]");
+    const quiz = quizzes.find(q => q.quizId === quizId);
+
+    if (!quiz) {
+      toast("❌ Quiz not found in local storage");
+      return;
+    }
+
+    clearTeacherDraft();
+    window._teacherEditingQuizId = quizId;
+    window._teacherTitleDraft = quiz.title;
+    
+    if (quiz.questions && Array.isArray(quiz.questions)) {
+      teacherQuestions = quiz.questions.map(q => ({
+        question: q.question,
+        options: q.options || [],
+        correct: q.correctAnswer || q.correct || ""
+      }));
+    } else {
+      teacherQuestions = [];
+    }
+
+    currentView = "teacher";
+    renderApp();
+  }
 }
 
 
@@ -3771,16 +4942,21 @@ if (!res.ok) {
 async function deleteTeacherQuiz(quizId) {
   if (!confirm("Delete this quiz permanently?")) return;
 
-  await fetch(
-    `${getBackendUrl()}/api/quizzes/${quizId}`,
-    { method: "DELETE" }
-  );
+  try {
+    await fetch(
+      `${getBackendUrl()}/api/quizzes/${quizId}`,
+      { method: "DELETE" }
+    );
+  } catch (err) {
+    console.log("Backend delete failed, removing from local storage only");
+  }
 
   const user = getUser();
   const key = `teacher_quizzes_${user.id}`;
   const quizzes = getTeacherQuizzes().filter(q => q.quizId !== quizId);
 
   localStorage.setItem(key, JSON.stringify(quizzes));
+  toast("✅ Quiz deleted");
   renderApp();
 }
 
@@ -3849,10 +5025,11 @@ async function submitTeacherQuiz() {
         }
       }
       
-      // Also save locally for offline access
+      // Also save locally for offline access (BEFORE clearing teacherQuestions)
       saveTeacherQuiz({
         quizId,
         title,
+        questions: teacherQuestions // PASS THE QUESTIONS ARRAY
       });
     }
 
@@ -3886,6 +5063,7 @@ function saveTeacherQuiz(quiz) {
   quizzes.unshift({
     quizId: quiz.quizId,
     title: quiz.title,
+    questions: quiz.questions || [], // INCLUDE QUESTIONS!
     createdAt: Date.now()
   });
 
@@ -5403,6 +6581,8 @@ function renderApp() {
     content = renderStudyView();
   } else if (currentView === "quiz") {
     content = renderQuizView();
+  } else if (currentView === "class-quiz") {
+    content = renderClassQuizView();
   } else if (currentView === "quiz-result") {
     content = renderQuizResultView();
   } else if (currentView === "customize") {
@@ -6041,6 +7221,292 @@ function generateQuizQuestions(cards) {
 function toggleTimerVisibility() {
   timerHidden = !timerHidden;
   renderApp();
+}
+
+// ============= CLASS QUIZ VIEW =============
+function renderClassQuizView() {
+  // Get the quiz data set by startClassQuiz()
+  const quiz = window._classQuiz;
+  
+  if (!quiz) {
+    return `<div class="p-6 text-center" style="color: var(--error);">Quiz data not found</div>`;
+  }
+  
+  // Initialize quiz state if needed
+  if (!window._classQuizState) {
+    window._classQuizState = {
+      currentIndex: 0,
+      score: 0,
+      answers: {},
+      startTime: Date.now()
+    };
+  }
+  
+  const state = window._classQuizState;
+  const questions = quiz.questions || [];
+  
+  if (!questions || questions.length === 0) {
+    return `<div class="p-6 text-center" style="color: var(--on-surface);">
+      <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Quiz Error</h3>
+      <p style="color: var(--on-surface-variant);">This quiz has no questions. Please contact your teacher.</p>
+      <button style="margin-top: 15px; padding: 10px 20px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold;"
+              onclick="currentView='student'; studentTab='classes'; renderApp()">Back to Classes</button>
+    </div>`;
+  }
+  
+  const currentQuestion = questions[state.currentIndex];
+  const progress = ((state.currentIndex + 1) / questions.length) * 100;
+  
+  if (!currentQuestion) {
+    // Quiz finished - show results with letter grade
+    const percentage = Math.round((state.score / questions.length) * 100);
+    const letterGrade = getLetterGrade(percentage);
+    const gradeColor = getGradeColor(letterGrade);
+    const attemptCount = getStudentQuizAttempts(window.currentStudent?.id, window._classQuizId).length;
+    const attemptLimit = getQuizAttemptLimit(window._classQuiz.classId, window._classQuizId);
+    
+    return `
+      <div class="p-6 rounded-xl shadow space-y-6"
+           style="background-color: var(--surface); color: var(--on-surface); max-width: 600px; margin: 0 auto;">
+        
+        <h2 class="text-2xl font-bold text-center">Quiz Complete!</h2>
+        
+        <!-- Large Grade Display -->
+        <div class="p-6 rounded-lg text-center"
+             style="background: linear-gradient(135deg, ${gradeColor}, ${gradeColor}dd);">
+          <div style="font-size: 72px; font-weight: bold; margin-bottom: 10px; color: white;">${letterGrade}</div>
+          <div style="font-size: 28px; font-weight: bold; color: white; margin-bottom: 5px;">${state.score}/${questions.length}</div>
+          <div style="font-size: 18px; color: rgba(255,255,255,0.9);">Score: ${percentage}%</div>
+        </div>
+        
+        <!-- Attempt Info -->
+        <div class="p-4 rounded-lg text-center"
+             style="background: var(--input-bg); border-left: 4px solid ${attemptCount >= attemptLimit ? 'var(--error)' : 'var(--primary)'};">
+          <p style="font-size: 14px; font-weight: bold;">Attempts: ${attemptCount} / ${attemptLimit}</p>
+          ${attemptCount < attemptLimit ? `
+            <p style="font-size: 12px; color: var(--on-surface-variant); margin-top: 4px;">You can retake this quiz</p>
+          ` : `
+            <p style="font-size: 12px; color: var(--error); margin-top: 4px;">❌ Maximum attempts reached</p>
+          `}
+        </div>
+        
+        <!-- Answer Review -->
+        <div style="max-height: 300px; overflow-y: auto;">
+          <h3 style="font-weight: bold; margin-bottom: 10px;">Answer Review</h3>
+          <div class="space-y-3">
+            ${questions.map((q, idx) => {
+              const correctAnswer = q.correctAnswer || q.correct;
+              const userAnswer = state.answers[idx];
+              
+              // Convert user answer to letter format if it's full text
+              let userAnswerLetter = userAnswer;
+              if (userAnswer && userAnswer.length > 1) {
+                const answerIndex = (q.options || []).indexOf(userAnswer);
+                userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
+              }
+              
+              // Determine the letter of the correct answer
+              let correctAnswerLetter = 'N/A';
+              if (correctAnswer && correctAnswer.length === 1 && correctAnswer >= 'A' && correctAnswer <= 'Z') {
+                correctAnswerLetter = correctAnswer;
+              } else {
+                const correctAnswerIndex = (q.options || []).indexOf(correctAnswer);
+                correctAnswerLetter = correctAnswerIndex >= 0 ? String.fromCharCode(65 + correctAnswerIndex) : 'N/A';
+              }
+              
+              // Compare the letter versions
+              const isCorrect = userAnswerLetter === correctAnswerLetter;
+              return `
+              <div class="p-4 rounded-lg"
+                   style="background: var(--input-bg); border-left: 4px solid ${isCorrect ? '#22c55e' : '#ef4444'};">
+                <p class="font-semibold mb-2" style="color: ${isCorrect ? '#22c55e' : '#ef4444'};">
+                  ${isCorrect ? '✓' : '✗'} Question ${idx + 1}: ${q.question}
+                </p>
+                <p class="text-sm mb-1">
+                  <strong>Your Answer:</strong> 
+                  <span style="color: ${isCorrect ? '#22c55e' : '#ef4444'};">
+                    ${state.answers[idx] ? (() => {
+                      const answerIndex = (q.options || []).indexOf(state.answers[idx]);
+                      return answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : 'Not answered';
+                    })() : 'Not answered'}
+                  </span>
+                </p>
+                ${!isCorrect ? `
+                  <p class="text-sm">
+                    <strong>Correct Answer:</strong>
+                    <span style="color: #22c55e;">${correctAnswerLetter}</span>
+                  </p>
+                ` : ''}
+              </div>
+            `;
+            }).join('')}
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="space-y-2">
+          ${attemptCount < attemptLimit ? `
+            <button style="width: 100%; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px;"
+                    onclick="window._classQuizState = null; startClassQuiz(window._classQuizId)">
+              Retake Quiz
+            </button>
+          ` : ''}
+          <button style="width: 100%; padding: 12px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px;"
+                  onclick="currentView='student'; studentTab='classes'; window._classQuiz = null; window._classQuizState = null; renderApp()">
+            Back to Classes
+          </button>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Show current question
+  return `
+    <div class="p-6 rounded-xl shadow space-y-6"
+         style="background-color: var(--surface); color: var(--on-surface); max-width: 800px; margin: 0 auto;">
+      
+      <!-- Header -->
+      <div class="flex justify-between items-center pb-4" style="border-bottom: 1px solid var(--border);">
+        <div>
+          <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">${quiz.title}</h2>
+          <p style="font-size: 14px; color: var(--on-surface-variant);">Question ${state.currentIndex + 1} of ${questions.length}</p>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${state.score}</div>
+          <div style="font-size: 12px; color: var(--on-surface-variant);">Points</div>
+        </div>
+      </div>
+      
+      <!-- Progress Bar -->
+      <div style="height: 6px; background: var(--input-bg); border-radius: 3px; overflow: hidden;">
+        <div style="height: 100%; width: ${progress}%; background: var(--primary); transition: width 0.3s ease;"></div>
+      </div>
+      
+      <!-- Question -->
+      <div style="background: var(--input-bg); padding: 20px; border-radius: 8px;">
+        <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">${currentQuestion.question}</h3>
+        
+        <!-- Options -->
+        <div class="space-y-2">
+          ${(currentQuestion.options || []).map((option, idx) => {
+            const isSelected = state.answers[state.currentIndex] === option;
+            const letter = String.fromCharCode(65 + idx); // A, B, C, D
+            return `
+              <button style="
+                display: block;
+                width: 100%;
+                padding: 12px 15px;
+                text-align: left;
+                border-radius: 6px;
+                border: 2px solid ${isSelected ? 'var(--primary)' : 'var(--border)'};
+                background: ${isSelected ? 'rgba(var(--primary-rgb), 0.1)' : 'var(--surface)'};
+                color: var(--on-surface);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                font-weight: ${isSelected ? 'bold' : 'normal'};
+              "
+              onclick="window._classQuizState.answers[${state.currentIndex}] = '${option}'; renderApp()">
+                <span style="display: inline-block; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--primary); margin-right: 10px; text-align: center; line-height: 24px; ${isSelected ? 'background: var(--primary); color: white;' : ''} font-weight: bold;">
+                  ${isSelected ? '✓' : letter}
+                </span>
+                <span style="font-weight: bold; color: var(--primary); margin-right: 8px;">${letter})</span>${option}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+      
+      <!-- Navigation Buttons -->
+      <div class="flex gap-3">
+        ${state.currentIndex > 0 ? `
+          <button style="flex: 1; padding: 12px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
+                  onclick="window._classQuizState.currentIndex--; renderApp()">
+            ← Previous
+          </button>
+        ` : ''}
+        
+        ${state.currentIndex < questions.length - 1 ? `
+          <button style="flex: 1; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold;"
+                  onclick="window._classQuizState.currentIndex++; renderApp()">
+            Next →
+          </button>
+        ` : `
+          <button style="flex: 1; padding: 12px; background: var(--success); color: white; border-radius: 6px; cursor: pointer; font-weight: bold;"
+                  onclick="finishClassQuiz()">
+            Submit Quiz
+          </button>
+        `}
+        
+        <button style="flex: 1; padding: 12px; background: var(--error); color: white; border-radius: 6px; cursor: pointer; font-weight: bold;"
+                onclick="if(confirm('Are you sure you want to exit this quiz without submitting?')) { currentView='student'; studentTab='classes'; window._classQuiz = null; window._classQuizState = null; renderApp(); }">
+          Exit
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function finishClassQuiz() {
+  if (!window._classQuizState) return;
+  
+  const state = window._classQuizState;
+  const quiz = window._classQuiz;
+  
+  // Calculate score based on correct answers
+  let correctCount = 0;
+  const questions = quiz.questions || [];
+  
+  questions.forEach((q, idx) => {
+    // Handle both property names for correct answer
+    const correctAnswer = q.correctAnswer || q.correct;
+    const userAnswer = state.answers[idx];
+    
+    // Convert user answer to letter format if it's full text
+    let userAnswerLetter = userAnswer;
+    if (userAnswer && userAnswer.length > 1) {
+      // User answer is full option text, convert to letter
+      const answerIndex = (q.options || []).indexOf(userAnswer);
+      userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
+    }
+    
+    // Normalize correct answer to letter format
+    let correctAnswerLetter = correctAnswer;
+    if (correctAnswer && correctAnswer.length > 1) {
+      // Correct answer is full option text, convert to letter
+      const correctIndex = (q.options || []).indexOf(correctAnswer);
+      correctAnswerLetter = correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : correctAnswer;
+    }
+    
+    // Compare the letter versions
+    if (userAnswerLetter === correctAnswerLetter) {
+      correctCount++;
+    }
+  });
+  
+  state.score = correctCount;
+  
+  // Save score to localStorage
+  const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
+  const percentage = Math.round((correctCount / questions.length) * 100);
+  const letterGrade = getLetterGrade(percentage);
+  const scoreKey = `${window._classQuizId}_${new Date().toISOString()}`;
+  scores[scoreKey] = {
+    quizId: window._classQuizId,
+    quizTitle: quiz.title,
+    score: correctCount,
+    total: questions.length,
+    percentage: percentage,
+    letterGrade: letterGrade,
+    completedAt: new Date().toISOString(),
+    studentId: window.currentStudent?.id,
+    attemptNumber: getStudentQuizAttempts(window.currentStudent?.id, window._classQuizId).length + 1
+  };
+  localStorage.setItem('studentQuizScores', JSON.stringify(scores));
+  
+  // Show results by re-rendering (will show results since currentIndex is at end)
+  window._classQuizState.currentIndex = questions.length;
+  renderApp();
+  toast('✅ Quiz submitted successfully!');
 }
 
 function renderQuizView() {

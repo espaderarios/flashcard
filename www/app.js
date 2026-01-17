@@ -12,6 +12,10 @@ if (window.currentTheme) applyThemePreset(window.currentTheme);
 })();
 
 const TEACHER_DRAFT_KEY = "teacher_quiz_draft";
+const STUDENT_PROFILE_KEY = "student_profile";
+const STUDENT_CLASSES_KEY = "student_enrolled_classes";
+const TEACHER_CLASSES_KEY = "teacher_classes";
+const CLASS_QUIZZES_KEY = "class_quizzes";
 
 function shuffleArray(array) {
   return array
@@ -45,6 +49,153 @@ function loadTeacherDraft() {
 
 function clearTeacherDraft() {
   localStorage.removeItem(TEACHER_DRAFT_KEY);
+}
+
+// ============= PROFILE & CLASS STORAGE FUNCTIONS =============
+
+function saveStudentProfile(profileData) {
+  localStorage.setItem(STUDENT_PROFILE_KEY, JSON.stringify(profileData));
+}
+
+function getStudentProfile() {
+  const profile = JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "{}");
+  return profile || {
+    name: window.currentStudent?.name || "",
+    id: window.currentStudent?.id || "",
+    email: "",
+    school: "",
+    grade: "",
+    profilePictureUrl: null,
+    googleId: null,
+    googleEmail: null
+  };
+}
+
+function saveClass(classData) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const exists = classes.find(c => c.id === classData.id);
+  
+  if (exists) {
+    Object.assign(exists, classData);
+  } else {
+    classes.push(classData);
+  }
+  
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(classes));
+}
+
+function getTeacherClasses(teacherId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  return classes.filter(c => c.teacherId === teacherId);
+}
+
+function getClassById(classId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  return classes.find(c => c.id === classId);
+}
+
+function deleteClass(classId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const filtered = classes.filter(c => c.id !== classId);
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
+}
+
+function enrollStudentInClass(classCode) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const targetClass = classes.find(c => c.classCode === classCode);
+  
+  if (!targetClass) {
+    return { success: false, error: "Invalid class code" };
+  }
+  
+  const studentId = window.currentStudent?.id;
+  if (!studentId) {
+    return { success: false, error: "Student ID not found" };
+  }
+  
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  const alreadyEnrolled = enrolledClasses.some(e => e.classId === targetClass.id && e.studentId === studentId);
+  
+  if (alreadyEnrolled) {
+    return { success: false, error: "Already enrolled in this class" };
+  }
+  
+  const enrollment = {
+    classId: targetClass.id,
+    className: targetClass.name,
+    teacherId: targetClass.teacherId,
+    studentId: studentId,
+    enrolledAt: new Date().toISOString()
+  };
+  
+  enrolledClasses.push(enrollment);
+  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(enrolledClasses));
+  
+  return { success: true };
+}
+
+function getStudentEnrolledClasses(studentId = null) {
+  if (!studentId) {
+    studentId = window.currentStudent?.id;
+  }
+  
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  return enrolledClasses.filter(e => e.studentId === studentId);
+}
+
+function getClassQuizzes(classId) {
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  return classQuizzes.filter(q => q.classId === classId);
+}
+
+function saveClassQuiz(quizData) {
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const exists = classQuizzes.find(q => q.id === quizData.id && q.classId === quizData.classId);
+  
+  if (exists) {
+    Object.assign(exists, quizData);
+  } else {
+    classQuizzes.push(quizData);
+  }
+  
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes));
+}
+
+function getLetterGrade(percentage) {
+  if (percentage >= 90) return 'A';
+  if (percentage >= 80) return 'B';
+  if (percentage >= 70) return 'C';
+  if (percentage >= 60) return 'D';
+  return 'F';
+}
+
+function getGradeColor(grade) {
+  switch(grade) {
+    case 'A': return '#22c55e'; // green
+    case 'B': return '#3b82f6'; // blue
+    case 'C': return '#f59e0b'; // orange
+    case 'D': return '#ef4444'; // red
+    case 'F': return '#7f1d1d'; // dark red
+    default: return 'var(--primary)';
+  }
+}
+
+function getStudentQuizAttempts(studentId, quizId) {
+  const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
+  return Object.values(scores).filter(s => s.studentId === studentId && s.quizId === quizId) || [];
+}
+
+function getQuizAttemptLimit(classId, quizId) {
+  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
+  const key = `${classId}_${quizId}`;
+  return limits[key] || 3; // Default 3 attempts
+}
+
+function setQuizAttemptLimit(classId, quizId, limit) {
+  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
+  const key = `${classId}_${quizId}`;
+  limits[key] = limit;
+  localStorage.setItem('quizAttemptLimits', JSON.stringify(limits));
 }
 
 function initTeacherView() {
@@ -2613,6 +2764,367 @@ function openStudentQuiz() {
   renderApp();
 }
 
+// ============= PROFILE & CLASS HELPER FUNCTIONS =============
+
+function handleProfilePictureUpload(file) {
+  if (!file) return;
+  
+  if (file.size > 5 * 1024 * 1024) {
+    toast('File size must be less than 5MB');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const pictureUrl = e.target.result;
+    const profile = getStudentProfile();
+    profile.profilePictureUrl = pictureUrl;
+    saveStudentProfile(profile);
+    renderApp();
+    toast('✅ Profile picture uploaded');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeProfilePicture() {
+  const profile = getStudentProfile();
+  profile.profilePictureUrl = null;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('Profile picture removed');
+}
+
+function connectGoogle() {
+  const email = prompt('Enter your Google email:');
+  if (!email) return;
+  
+  const profile = getStudentProfile();
+  profile.googleId = `google_${Date.now()}`;
+  profile.googleEmail = email;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('✅ Google account connected');
+}
+
+function disconnectGoogle() {
+  if (!confirm('Are you sure you want to disconnect your Google account?')) return;
+  
+  const profile = getStudentProfile();
+  profile.googleId = null;
+  profile.googleEmail = null;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('Google account disconnected');
+}
+
+function saveEnhancedProfile() {
+  const name = document.getElementById('profile-name')?.value?.trim();
+  const studentId = document.getElementById('profile-student-id')?.value?.trim();
+  const email = document.getElementById('profile-email')?.value?.trim();
+  const school = document.getElementById('profile-school')?.value?.trim();
+  const grade = document.getElementById('profile-grade')?.value?.trim();
+  
+  if (!name || !studentId) {
+    toast('❌ Name and Student ID are required');
+    return;
+  }
+  
+  const profile = getStudentProfile();
+  profile.name = name;
+  profile.id = studentId;
+  profile.email = email;
+  profile.school = school;
+  profile.grade = grade;
+  
+  saveStudentProfile(profile);
+  window.currentStudent = profile;
+  localStorage.setItem('currentStudent', JSON.stringify(profile));
+  
+  renderApp();
+  toast('✅ Profile saved successfully');
+}
+
+function enrollInClass() {
+  const classCode = document.getElementById('class-code-input')?.value?.trim()?.toUpperCase();
+  
+  if (!classCode) {
+    toast('❌ Please enter a class code');
+    return;
+  }
+  
+  const result = enrollStudentInClass(classCode);
+  
+  if (result.success) {
+    document.getElementById('class-code-input').value = '';
+    renderApp();
+    toast('✅ Successfully enrolled in class!');
+  } else {
+    toast('❌ ' + result.error);
+  }
+}
+
+function unenrollFromClass(classId) {
+  if (!confirm('Are you sure you want to unenroll from this class?')) return;
+  
+  const enrolledClasses = getStudentEnrolledClasses();
+  const filtered = enrolledClasses.filter(e => e.classId !== classId);
+  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(filtered));
+  
+  renderApp();
+  toast('Unenrolled from class');
+}
+
+function startClassQuiz(quizId) {
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const quiz = classQuizzes.find(q => q.id === quizId);
+  
+  if (!quiz) {
+    toast('Quiz not found');
+    return;
+  }
+  
+  // Check attempt limit
+  const studentId = window.currentStudent?.id;
+  const classId = quiz.classId;
+  const attemptLimit = getQuizAttemptLimit(classId, quizId);
+  const attempts = getStudentQuizAttempts(studentId, quizId);
+  
+  if (attempts.length >= attemptLimit) {
+    toast(`❌ You have reached the maximum of ${attemptLimit} attempt(s) for this quiz`);
+    return;
+  }
+  
+  if (quiz.timeLimit) {
+    window._quizTimeLimit = quiz.timeLimit * 60;
+  }
+  
+  window._classQuizId = quizId;
+  window._classQuiz = quiz;
+  currentView = 'class-quiz';
+  renderApp();
+}
+
+function createNewClass() {
+  const name = document.getElementById('new-class-name')?.value?.trim();
+  const subject = document.getElementById('new-class-subject')?.value?.trim();
+  const grade = document.getElementById('new-class-grade')?.value?.trim();
+  const description = document.getElementById('new-class-description')?.value?.trim();
+  
+  if (!name) {
+    toast('❌ Class name is required');
+    return;
+  }
+  
+  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
+  const classId = 'class_' + Date.now();
+  const classCode = generateClassCode();
+  
+  const newClass = {
+    id: classId,
+    name: name,
+    subject: subject || '',
+    grade: grade || '',
+    description: description || '',
+    classCode: classCode,
+    teacherId: teacherId,
+    createdAt: new Date().toISOString()
+  };
+  
+  saveClass(newClass);
+  
+  document.getElementById('new-class-name').value = '';
+  document.getElementById('new-class-subject').value = '';
+  document.getElementById('new-class-grade').value = '';
+  document.getElementById('new-class-description').value = '';
+  
+  renderApp();
+  toast('✅ Class created successfully!');
+}
+
+function generateClassCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  if (allClasses.some(c => c.classCode === code)) {
+    return generateClassCode();
+  }
+  
+  return code;
+}
+
+function deleteTeacherClass(classId) {
+  if (!confirm('Are you sure you want to delete this class? This action cannot be undone.')) return;
+  
+  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
+  const classes = getTeacherClasses(teacherId);
+  const filtered = classes.filter(c => c.id !== classId);
+  
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
+  
+  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const filteredQuizzes = allQuizzes.filter(q => q.classId !== classId);
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filteredQuizzes));
+  
+  renderApp();
+  toast('Class and associated quizzes deleted');
+}
+
+function openAddQuizToClassModal(classId) {
+  // Get all quizzes from localStorage
+  const quizzes = [];
+  
+  // Search through all localStorage keys for teacher quizzes
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(stored)) {
+          quizzes.push(...stored);
+        }
+      } catch (e) {
+        console.error('Error parsing quiz key:', key, e);
+      }
+    }
+  }
+  
+  if (quizzes.length === 0) {
+    toast('❌ You need to create quizzes first in the Dashboard');
+    return;
+  }
+  
+  let html = '<div style="background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px;">';
+  html += '<h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Add Quiz to Class</h3>';
+  html += '<p style="font-size: 14px; margin-bottom: 15px; color: var(--on-surface-variant);">Select a quiz to add to this class:</p>';
+  html += '<div style="max-height: 400px; overflow-y: auto; space-y: 2;">';
+  
+  quizzes.forEach(quiz => {
+    html += `
+      <div style="background: var(--input-bg); padding: 10px; border-radius: 6px; margin-bottom: 10px; cursor: pointer;"
+           onclick="assignQuizToClass('${classId}', '${quiz.quizId || quiz.id}'); toast('✅ Quiz added to class')">
+        <p style="font-weight: bold;">${quiz.title || quiz.quizName || 'Untitled Quiz'}</p>
+        <p style="font-size: 12px; color: var(--on-surface-variant);">${quiz.questions?.length || 0} questions</p>
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  html += `<button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
+           onclick="document.querySelector('[data-modal-overlay]').remove(); teacherTab='classes'; renderApp()">Close</button>`;
+  html += '</div>';
+  
+  const overlay = document.createElement('div');
+  overlay.setAttribute('data-modal-overlay', 'true');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;';
+  overlay.innerHTML = `<div style="width: 90%; max-width: 500px;">${html}</div>`;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  document.body.appendChild(overlay);
+}
+
+function assignQuizToClass(classId, quizId) {
+  // Find quiz from all storage locations
+  let quiz = null;
+  
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(stored)) {
+          quiz = stored.find(q => q.quizId === quizId || q.id === quizId);
+          if (quiz) break;
+        }
+      } catch (e) {
+        console.error('Error parsing quiz key:', key, e);
+      }
+    }
+  }
+  
+  if (!quiz) {
+    toast('Quiz not found');
+    return;
+  }
+  
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  
+  if (classQuizzes.some(cq => cq.classId === classId && cq.id === quizId)) {
+    toast('This quiz is already in the class');
+    return;
+  }
+  
+  // If quiz doesn't have questions locally, try to fetch from Cloudflare
+  let questions = quiz.questions || [];
+  
+  if (!questions || questions.length === 0) {
+    // Try to fetch from Cloudflare (async, but we'll save what we have)
+    toast('⏳ Fetching quiz details...');
+    
+    // Fetch from Cloudflare in background
+    (async () => {
+      try {
+        const cfData = await getQuizFromCloudflare(quizId);
+        if (cfData && cfData.questions) {
+          questions = cfData.questions;
+          
+          // Update the stored quiz with questions
+          const key = `teacher_quizzes_${getUser().id}`;
+          const stored = JSON.parse(localStorage.getItem(key) || '[]');
+          const idx = stored.findIndex(q => q.quizId === quizId);
+          if (idx >= 0) {
+            stored[idx].questions = questions;
+            localStorage.setItem(key, JSON.stringify(stored));
+          }
+          
+          // Update class quiz with questions
+          const classQuizzes2 = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+          const cqIdx = classQuizzes2.findIndex(cq => cq.classId === classId && cq.id === quizId);
+          if (cqIdx >= 0) {
+            classQuizzes2[cqIdx].questions = questions;
+            localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes2));
+          }
+          
+          toast('✅ Quiz added with ' + questions.length + ' questions!');
+          renderApp();
+        }
+      } catch (err) {
+        console.log('Could not fetch from Cloudflare, using local data');
+      }
+    })();
+  }
+  
+  const classQuiz = {
+    id: quizId,
+    classId: classId,
+    title: quiz.quizName || quiz.title || 'Untitled Quiz',
+    questions: questions,
+    timeLimit: null,
+    createdAt: new Date().toISOString()
+  };
+  
+  classQuizzes.push(classQuiz);
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes));
+  
+  teacherTab = 'classes';
+  renderApp();
+}
+
+function removeQuizFromClass(classId, quizId) {
+  if (!confirm('Remove this quiz from the class?')) return;
+  
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const filtered = classQuizzes.filter(q => !(q.classId === classId && q.id === quizId));
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filtered));
+  
+  renderApp();
+  toast('Quiz removed from class');
+}
+
 function renderStudentView() {
   return `
     <div class="flex flex-col items-center mt-6 space-y-6 w-full">
@@ -3584,26 +4096,59 @@ function previewTeacherQuiz() {
 
 
 async function editTeacherQuiz(quizId) {
-  const res = await fetch(
-    `${getBackendUrl()}/api/quizzes/${quizId}`
-  );
+  try {
+    const res = await fetch(
+      `${getBackendUrl()}/api/quizzes/${quizId}`
+    );
 
-if (!res.ok) {
-  const err = await res.json();
-  toast(err.error || "Failed to update quiz");
-  return;
-}
+    if (!res.ok) {
+      throw new Error("Failed to fetch quiz");
+    }
 
-  const data = await res.json();
+    const data = await res.json();
 
-  clearTeacherDraft();
+    clearTeacherDraft();
 
-  window._teacherEditingQuizId = quizId;
-  window._teacherTitleDraft = data.quiz.title;
-  teacherQuestions = data.questions;
+    window._teacherEditingQuizId = quizId;
+    window._teacherTitleDraft = data.quiz.title;
+    teacherQuestions = data.questions || [];
 
-  currentView = "teacher";
-  renderApp();
+    currentView = "teacher";
+    renderApp();
+  } catch (err) {
+    // Fallback: load from localStorage
+    const user = getUser();
+    if (!user) {
+      toast("❌ Please log in first");
+      return;
+    }
+
+    const key = `teacher_quizzes_${user.id}`;
+    const quizzes = JSON.parse(localStorage.getItem(key) || "[]");
+    const quiz = quizzes.find(q => q.quizId === quizId);
+
+    if (!quiz) {
+      toast("❌ Quiz not found in local storage");
+      return;
+    }
+
+    clearTeacherDraft();
+    window._teacherEditingQuizId = quizId;
+    window._teacherTitleDraft = quiz.title;
+    
+    if (quiz.questions && Array.isArray(quiz.questions)) {
+      teacherQuestions = quiz.questions.map(q => ({
+        question: q.question,
+        options: q.options || [],
+        correct: q.correctAnswer || q.correct || ""
+      }));
+    } else {
+      teacherQuestions = [];
+    }
+
+    currentView = "teacher";
+    renderApp();
+  }
 }
 
 
@@ -3612,16 +4157,21 @@ if (!res.ok) {
 async function deleteTeacherQuiz(quizId) {
   if (!confirm("Delete this quiz permanently?")) return;
 
-  await fetch(
-    `${getBackendUrl()}/api/quizzes/${quizId}`,
-    { method: "DELETE" }
-  );
+  try {
+    await fetch(
+      `${getBackendUrl()}/api/quizzes/${quizId}`,
+      { method: "DELETE" }
+    );
+  } catch (err) {
+    console.log("Backend delete failed, removing from local storage only");
+  }
 
   const user = getUser();
   const key = `teacher_quizzes_${user.id}`;
   const quizzes = getTeacherQuizzes().filter(q => q.quizId !== quizId);
 
   localStorage.setItem(key, JSON.stringify(quizzes));
+  toast("✅ Quiz deleted");
   renderApp();
 }
 
@@ -3678,6 +4228,7 @@ async function submitTeacherQuiz() {
       saveTeacherQuiz({
         quizId: data.quizId,
         title,
+        questions: teacherQuestions // PASS THE QUESTIONS ARRAY
       });
     }
 
@@ -3717,6 +4268,7 @@ function saveTeacherQuiz(quiz) {
   quizzes.unshift({
     quizId: quiz.quizId,
     title: quiz.title,
+    questions: quiz.questions || [], // INCLUDE QUESTIONS!
     createdAt: Date.now()
   });
 
@@ -5161,6 +5713,8 @@ function renderApp() {
     content = renderStudyView();
   } else if (currentView === "quiz") {
     content = renderQuizView();
+  } else if (currentView === "class-quiz") {
+    content = renderClassQuizView();
   } else if (currentView === "quiz-result") {
     content = renderQuizResultView();
   } else if (currentView === "customize") {
@@ -5799,6 +6353,263 @@ function generateQuizQuestions(cards) {
 function toggleTimerVisibility() {
   timerHidden = !timerHidden;
   renderApp();
+}
+
+// ============= CLASS QUIZ VIEW =============
+function renderClassQuizView() {
+  // Get the quiz data set by startClassQuiz()
+  const quiz = window._classQuiz;
+  
+  if (!quiz) {
+    return `<div class="p-6 text-center" style="color: var(--error);">Quiz data not found</div>`;
+  }
+  
+  // Initialize quiz state if needed
+  if (!window._classQuizState) {
+    window._classQuizState = {
+      currentIndex: 0,
+      score: 0,
+      answers: {},
+      startTime: Date.now()
+    };
+  }
+  
+  const state = window._classQuizState;
+  const questions = quiz.questions || [];
+  
+  if (!questions || questions.length === 0) {
+    return `<div class="p-6 text-center" style="color: var(--on-surface);">
+      <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Quiz Error</h3>
+      <p style="color: var(--on-surface-variant);">This quiz has no questions. Please contact your teacher.</p>
+      <button style="margin-top: 15px; padding: 10px 20px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold;"
+              onclick="currentView='student'; studentTab='classes'; renderApp()">Back to Classes</button>
+    </div>`;
+  }
+  
+  const currentQuestion = questions[state.currentIndex];
+  const progress = ((state.currentIndex + 1) / questions.length) * 100;
+  
+  if (!currentQuestion) {
+    // Quiz finished - show results
+    return `
+      <div class="p-6 rounded-xl shadow space-y-6"
+           style="background-color: var(--surface); color: var(--on-surface); max-width: 600px; margin: 0 auto;">
+        
+        <h2 class="text-2xl font-bold text-center">Quiz Complete!</h2>
+        
+        <div class="p-6 rounded-lg text-center"
+             style="background: linear-gradient(135deg, var(--primary), var(--primary)dd); color: white;">
+          <div style="font-size: 48px; font-weight: bold; margin-bottom: 10px;">${state.score}/${questions.length}</div>
+          <div style="font-size: 18px;">Score: ${Math.round((state.score / questions.length) * 100)}%</div>
+        </div>
+        
+        <div class="space-y-3">
+          ${questions.map((q, idx) => {
+            const correctAnswer = q.correctAnswer || q.correct;
+            const userAnswer = state.answers[idx];
+            
+            // Convert user answer to letter format if it's full text
+            let userAnswerLetter = userAnswer;
+            if (userAnswer && userAnswer.length > 1) {
+              const answerIndex = (q.options || []).indexOf(userAnswer);
+              userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
+            }
+            
+            // Determine the letter of the correct answer
+            let correctAnswerLetter = 'N/A';
+            if (correctAnswer && correctAnswer.length === 1 && correctAnswer >= 'A' && correctAnswer <= 'Z') {
+              // Already a letter (A, B, C, D)
+              correctAnswerLetter = correctAnswer;
+            } else {
+              // Find the letter of the correct answer in options
+              const correctAnswerIndex = (q.options || []).indexOf(correctAnswer);
+              correctAnswerLetter = correctAnswerIndex >= 0 ? String.fromCharCode(65 + correctAnswerIndex) : 'N/A';
+            }
+            
+            // Compare the letter versions
+            const isCorrect = userAnswerLetter === correctAnswerLetter;
+            return `
+            <div class="p-4 rounded-lg"
+                 style="background: var(--input-bg); border-left: 4px solid ${isCorrect ? 'var(--success)' : 'var(--error)'};">
+              <p class="font-semibold mb-2">Question ${idx + 1}: ${q.question}</p>
+              <p class="text-sm mb-1">
+                <strong>Your Answer:</strong> 
+                <span style="color: ${isCorrect ? 'var(--success)' : 'var(--error)'};">
+                  ${state.answers[idx] ? (() => {
+                    const answerIndex = (q.options || []).indexOf(state.answers[idx]);
+                    return answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : 'Not answered';
+                  })() : 'Not answered'}
+                </span>
+              </p>
+              ${!isCorrect ? `
+                <p class="text-sm">
+                  <strong>Correct Answer:</strong>
+                  <span style="color: var(--success);">${(() => {
+                    const correctAnswerIndex = (q.options || []).indexOf(correctAnswer);
+                    return correctAnswerIndex >= 0 ? String.fromCharCode(65 + correctAnswerIndex) : 'N/A';
+                  })()}</span>
+                </p>
+              ` : ''}
+            </div>
+          `;
+          }).join('')}
+        </div>
+        
+        <button style="width: 100%; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px;"
+                onclick="currentView='student'; studentTab='classes'; window._classQuiz = null; window._classQuizState = null; renderApp()">
+          Back to Classes
+        </button>
+      </div>
+    `;
+  }
+  
+  // Show current question
+  return `
+    <div class="p-6 rounded-xl shadow space-y-6"
+         style="background-color: var(--surface); color: var(--on-surface); max-width: 800px; margin: 0 auto;">
+      
+      <!-- Header -->
+      <div class="flex justify-between items-center pb-4" style="border-bottom: 1px solid var(--border);">
+        <div>
+          <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">${quiz.title}</h2>
+          <p style="font-size: 14px; color: var(--on-surface-variant);">Question ${state.currentIndex + 1} of ${questions.length}</p>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${state.score}</div>
+          <div style="font-size: 12px; color: var(--on-surface-variant);">Points</div>
+        </div>
+      </div>
+      
+      <!-- Progress Bar -->
+      <div style="height: 6px; background: var(--input-bg); border-radius: 3px; overflow: hidden;">
+        <div style="height: 100%; width: ${progress}%; background: var(--primary); transition: width 0.3s ease;"></div>
+      </div>
+      
+      <!-- Question -->
+      <div style="background: var(--input-bg); padding: 20px; border-radius: 8px;">
+        <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">${currentQuestion.question}</h3>
+        
+        <!-- Options -->
+        <div class="space-y-2">
+          ${(currentQuestion.options || []).map((option, idx) => {
+            const isSelected = state.answers[state.currentIndex] === option;
+            const letter = String.fromCharCode(65 + idx); // A, B, C, D
+            return `
+              <button style="
+                display: block;
+                width: 100%;
+                padding: 12px 15px;
+                text-align: left;
+                border-radius: 6px;
+                border: 2px solid ${isSelected ? 'var(--primary)' : 'var(--border)'};
+                background: ${isSelected ? 'rgba(var(--primary-rgb), 0.1)' : 'var(--surface)'};
+                color: var(--on-surface);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                font-weight: ${isSelected ? 'bold' : 'normal'};
+              "
+              onclick="window._classQuizState.answers[${state.currentIndex}] = '${option}'; renderApp()">
+                <span style="display: inline-block; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--primary); margin-right: 10px; text-align: center; line-height: 24px; ${isSelected ? 'background: var(--primary); color: white;' : ''} font-weight: bold;">
+                  ${isSelected ? '✓' : letter}
+                </span>
+                <span style="font-weight: bold; color: var(--primary); margin-right: 8px;">${letter})</span>${option}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+      
+      <!-- Navigation Buttons -->
+      <div class="flex gap-3">
+        ${state.currentIndex > 0 ? `
+          <button style="flex: 1; padding: 12px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
+                  onclick="window._classQuizState.currentIndex--; renderApp()">
+            ← Previous
+          </button>
+        ` : ''}
+        
+        ${state.currentIndex < questions.length - 1 ? `
+          <button style="flex: 1; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold;"
+                  onclick="window._classQuizState.currentIndex++; renderApp()">
+            Next →
+          </button>
+        ` : `
+          <button style="flex: 1; padding: 12px; background: var(--success); color: white; border-radius: 6px; cursor: pointer; font-weight: bold;"
+                  onclick="finishClassQuiz()">
+            Submit Quiz
+          </button>
+        `}
+        
+        <button style="flex: 1; padding: 12px; background: var(--error); color: white; border-radius: 6px; cursor: pointer; font-weight: bold;"
+                onclick="if(confirm('Are you sure you want to exit this quiz without submitting?')) { currentView='student'; studentTab='classes'; window._classQuiz = null; window._classQuizState = null; renderApp(); }">
+          Exit
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function finishClassQuiz() {
+  if (!window._classQuizState) return;
+  
+  const state = window._classQuizState;
+  const quiz = window._classQuiz;
+  
+  // Calculate score based on correct answers
+  let correctCount = 0;
+  const questions = quiz.questions || [];
+  
+  questions.forEach((q, idx) => {
+    // Handle both property names for correct answer
+    const correctAnswer = q.correctAnswer || q.correct;
+    const userAnswer = state.answers[idx];
+    
+    // Convert user answer to letter format if it's full text
+    let userAnswerLetter = userAnswer;
+    if (userAnswer && userAnswer.length > 1) {
+      // User answer is full option text, convert to letter
+      const answerIndex = (q.options || []).indexOf(userAnswer);
+      userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
+    }
+    
+    // Normalize correct answer to letter format
+    let correctAnswerLetter = correctAnswer;
+    if (correctAnswer && correctAnswer.length > 1) {
+      // Correct answer is full option text, convert to letter
+      const correctIndex = (q.options || []).indexOf(correctAnswer);
+      correctAnswerLetter = correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : correctAnswer;
+    }
+    
+    // Compare the letter versions
+    if (userAnswerLetter === correctAnswerLetter) {
+      correctCount++;
+    }
+  });
+  
+  state.score = correctCount;
+  
+  // Save score to localStorage
+  const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
+  const percentage = Math.round((correctCount / questions.length) * 100);
+  const letterGrade = getLetterGrade(percentage);
+  const scoreKey = `${window._classQuizId}_${new Date().toISOString()}`;
+  scores[scoreKey] = {
+    quizId: window._classQuizId,
+    quizTitle: quiz.title,
+    score: correctCount,
+    total: questions.length,
+    percentage: percentage,
+    letterGrade: letterGrade,
+    completedAt: new Date().toISOString(),
+    studentId: window.currentStudent?.id,
+    attemptNumber: getStudentQuizAttempts(window.currentStudent?.id, window._classQuizId).length + 1
+  };
+  localStorage.setItem('studentQuizScores', JSON.stringify(scores));
+  
+  // Show results by re-rendering (will show results since currentIndex is at end)
+  window._classQuizState.currentIndex = questions.length;
+  renderApp();
+  toast('✅ Quiz submitted successfully!');
 }
 
 function renderQuizView() {
