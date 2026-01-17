@@ -37,23 +37,32 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
 
-  // Skip API calls to backend - cache them separately
-  if (url.origin.includes("quiz-backend.espaderario.workers.dev")) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          // Cache successful API responses
-          if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(API_CACHE).then(cache => cache.put(event.request, responseClone));
-          }
-          return response;
-        })
-        .catch(() => {
-          // Return cached API response if available
-          return caches.match(event.request);
-        })
-    );
+  // Skip API calls to backend - cache them separately (only GET requests)
+  if (url.origin.includes("quiz-backend.espaderario.workers.dev") || 
+      url.origin.includes("flashcard.espaderario.workers.dev")) {
+    // Only cache GET requests, let POST/PUT/DELETE go through
+    if (event.request.method === 'GET') {
+      event.respondWith(
+        fetch(event.request)
+          .then(response => {
+            // Cache successful GET responses
+            if (response.ok) {
+              const responseClone = response.clone();
+              caches.open(API_CACHE).then(cache => cache.put(event.request, responseClone));
+            }
+            return response;
+          })
+          .catch(() => {
+            // Return cached API response if available
+            return caches.match(event.request);
+          })
+      );
+    } else {
+      // For POST/PUT/DELETE, just let them through without caching
+      event.respondWith(fetch(event.request).catch(() => {
+        return new Response('Network error', { status: 503, statusText: 'Service Unavailable' });
+      }));
+    }
     return;
   }
 
@@ -73,16 +82,17 @@ self.addEventListener("fetch", event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Cache successful responses
-        if (response.ok) {
+        // Cache successful responses (only for GET requests)
+        if (response.ok && event.request.method === 'GET') {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
         }
         return response;
       })
       .catch(() => {
-        // Return cached version
-        return caches.match(event.request);
+        // Return cached version if available
+        return caches.match(event.request)
+          .then(cached => cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' }));
       })
   );
 });

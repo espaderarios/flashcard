@@ -1,0 +1,29 @@
+name = "flashcard-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-15"
+
+# KV Namespace for storing quizzes
+[[kv_namespaces]]
+binding = "QUIZZES"
+id = "14cbac0911d64d658c46e27bb8b35e8f"
+preview_id = "8d995c799371414ab66975c019835e39"
+
+# Environment variables
+[env.production]
+kv_namespaces = [
+  { binding = "QUIZZES", id = "14cbac0911d64d658c46e27bb8b35e8f" }
+]
+
+[env.development]
+kv_namespaces = [
+  { binding = "QUIZZES", preview_id = "8d995c799371414ab66975c019835e39" }
+]
+
+# Build configuration
+[build]
+command = "npm install"
+cwd = "./"
+
+# Triggers for scheduled tasks (optional)
+[triggers]
+crons = []
