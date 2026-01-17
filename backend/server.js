@@ -39,6 +39,10 @@ app.use(cors(config.cors));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Serve static files from parent directory
+const parentDir = path.dirname(__dirname);
+app.use(express.static(parentDir));
+
 // In-memory storage (replace with database in production)
 let quizzes = new Map();
 let quizCounter = 1;
@@ -433,6 +437,7 @@ app.post('/api/generate-cards', async (req, res) => {
 
     const openaiKey = process.env.GROQ_API_KEY;
     if (!openaiKey) {
+      console.error('GROQ_API_KEY not found in environment variables');
       return res.status(500).json({ error: 'Groq API key not configured' });
     }
 
@@ -448,54 +453,60 @@ Format your response as a JSON array with this structure:
 
 Return ONLY valid JSON, no other text.`;
 
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: config.ai.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful flashcard generator. Always respond with valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: prompt
+    try {
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: config.ai.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful flashcard generator. Always respond with valid JSON only.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: config.ai.temperature,
+          max_tokens: 2000
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json'
           }
-        ],
-        temperature: config.ai.temperature,
-        max_tokens: 2000
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json'
+        }
+      );
+
+      const content = response.data.choices[0].message.content;
+      let cards;
+      
+      try {
+        cards = JSON.parse(content);
+      } catch (e) {
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          cards = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('Failed to parse AI response as JSON');
         }
       }
-    );
 
-    const content = response.data.choices[0].message.content;
-    let cards;
-    
-    try {
-      cards = JSON.parse(content);
-    } catch (e) {
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        cards = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('Failed to parse AI response as JSON');
-      }
+      res.json({ 
+        success: true,
+        cards: cards.slice(0, count)
+      });
+    } catch (apiError) {
+      console.error('Groq API Error:', apiError.response?.status, apiError.response?.data || apiError.message);
+      throw apiError;
     }
-
-    res.json({ 
-      success: true,
-      cards: cards.slice(0, count)
-    });
 
   } catch (error) {
     console.error('Card Generation Error:', error.message);
     res.status(500).json({ 
-      error: error.message || 'Failed to generate flashcards'
+      error: error.message || 'Failed to generate flashcards',
+      details: error.response?.data?.error?.message || null
     });
   }
 });
@@ -681,6 +692,11 @@ app.get('/', (req, res) => {
       listQuizzes: 'GET /api/quizzes'
     }
   });
+});
+
+// Catch-all for undefined routes
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found', path: req.path, method: req.method });
 });
 
 // Error handling middleware
