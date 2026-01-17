@@ -198,6 +198,7 @@ async function createQuizOnCloudflare(title, questions) {
 async function getQuizFromCloudflare(quizId) {
   try {
     const cloudflareUrl = getCloudflareUrl();
+    console.log(`Fetching quiz from: ${cloudflareUrl}/api/quizzes/${quizId}`);
     
     const response = await fetch(`${cloudflareUrl}/api/quizzes/${quizId}`, {
       method: 'GET',
@@ -207,10 +208,17 @@ async function getQuizFromCloudflare(quizId) {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Cloudflare API returned ${response.status}: ${errorText}`);
+      throw new Error(`HTTP ${response.status} - Quiz may not exist or has expired`);
     }
 
     const data = await response.json();
+    
+    // Return quiz object directly (not wrapped in success property)
+    if (data.quiz) {
+      return data.quiz;
+    }
     return data;
   } catch (error) {
     console.error('Cloudflare get quiz error:', error);
@@ -3814,15 +3822,24 @@ async function submitTeacherQuiz() {
       }
       toast("✅ Quiz updated successfully!");
     } else {
-      // For new quizzes, save to Cloudflare
-      quizId = "quiz_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-      
+      // For new quizzes, save to Cloudflare and use the returned ID
       const cfResult = await createQuizOnCloudflare(title, teacherQuestions);
       
       if (!cfResult || cfResult.error) {
-        toast("⚠️ Saved locally but failed to sync to cloud: " + (cfResult?.error || "Unknown error"));
+        toast("⚠️ Failed to sync to cloud: " + (cfResult?.error || "Unknown error"));
+        // Generate local ID as fallback
+        quizId = "quiz_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
       } else {
-        toast("✅ Quiz created and synced to cloud!");
+        // Use the quiz ID returned from Cloudflare
+        quizId = cfResult.quiz?.id || cfResult.id;
+        if (!quizId) {
+          console.error('No quiz ID returned from Cloudflare:', cfResult);
+          toast("⚠️ Quiz created but couldn't retrieve ID from cloud");
+          quizId = "quiz_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+        } else {
+          toast("✅ Quiz created and synced to cloud!");
+          console.log('Quiz created with ID:', quizId);
+        }
       }
       
       // Also save locally for offline access
@@ -3943,22 +3960,41 @@ async function loadStudentQuiz(quizIdParam) {
     return;
   }
 
+  // ⚠️ REQUIRE ACCOUNT FIRST
   if (!window.currentStudent || !window.currentStudent.name || !window.currentStudent.id) {
+    // Save the quiz ID to resume after account setup
     pendingQuizId = quizId;
-    openStudentInfoModal();
+    
+    // Show warning
+    document.getElementById("student-error").innerText = "⚠️ Please create your account first before entering a quiz";
+    
+    // Show modal after brief delay so user sees the warning
+    setTimeout(() => {
+      openStudentInfoModal();
+    }, 500);
     return;
   }
 
   try {
+    // Show loading state
+    document.getElementById("student-error").innerText = "Loading quiz...";
+    
     // Fetch from Cloudflare
     const data = await getQuizFromCloudflare(quizId);
 
     if (!data || data.error) {
-      document.getElementById("student-error").innerText = "Quiz not found";
+      console.error('Quiz data error:', data);
+      document.getElementById("student-error").innerText = "❌ Quiz not found. Make sure the quiz ID is correct and hasn't expired.";
       return;
     }
 
-    quizQuestions = data.questions || [];
+    const questions = data.questions || [];
+    if (!questions || questions.length === 0) {
+      document.getElementById("student-error").innerText = "❌ Quiz has no questions";
+      return;
+    }
+
+    quizQuestions = questions;
     currentQuizId = quizId;
     quizIndex = 0;
     quizScore = 0;
@@ -3967,12 +4003,15 @@ async function loadStudentQuiz(quizIdParam) {
     answeredQuestions = new Set();
     confirmedAnswers = {};
 
+    // Clear any error messages
+    document.getElementById("student-error").innerText = "";
+    
     currentView = "teacher-quiz";
     renderApp();
 
   } catch (err) {
-    document.getElementById("student-error").innerText = "Network error: " + err.message;
     console.error("Error loading quiz:", err);
+    document.getElementById("student-error").innerText = `❌ Error: ${err.message}`;
   }
 }
 
