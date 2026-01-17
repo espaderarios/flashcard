@@ -117,15 +117,22 @@ async function submitQuizToCloudflare(quizId, answers) {
       },
       body: JSON.stringify({
         quizId,
-        answers
+        answers,
+        studentName: window.currentStudent?.name || 'Anonymous',
+        studentId: window.currentStudent?.id || 'unknown',
+        score: quizScore,
+        totalQuestions: quizQuestions.length,
       })
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Cloudflare API returned ${response.status}: ${errorText}`);
+      throw new Error(`HTTP ${response.status} - Failed to submit quiz results`);
     }
 
     const data = await response.json();
+    console.log('Quiz submitted successfully:', data);
     return data;
   } catch (error) {
     console.error('Cloudflare submit error:', error);
@@ -4317,11 +4324,36 @@ function answerTeacherQuiz(selectedLetter) {
 function selectTeacherQuiz(letter) {
   selectedAnswer = letter;
   // Update button styles without re-rendering
-  const buttons = document.querySelectorAll('.max-w-4xl.mx-auto.fade-in.w-full .grid.gap-4.md\\:gap-6 button');
+  // Find the quiz container first, then the buttons within it
+  const quizContainer = document.querySelector('[class*="teacher-quiz"]') || 
+                        document.querySelector('.max-w-4xl') ||
+                        document.querySelector('.fade-in');
+  
+  if (!quizContainer) {
+    console.warn("Could not find quiz container");
+    return;
+  }
+
+  // Look for buttons in the container
+  const buttons = quizContainer.querySelectorAll('button[onclick*="selectTeacherQuiz"]');
+  
   if (buttons.length === 0) {
+    // Fallback: try to find option buttons by looking for A, B, C, D text
+    const allButtons = quizContainer.querySelectorAll('button');
+    if (allButtons.length > 0) {
+      const letters = ['A', 'B', 'C', 'D'];
+      allButtons.forEach((btn, j) => {
+        if (j < 4) {  // Only the first 4 buttons are options
+          const isSelected = letters[j] === letter;
+          btn.classList.toggle('selected', isSelected);
+        }
+      });
+      return;
+    }
     console.warn("Could not find quiz option buttons to update");
     return;
   }
+
   const letters = ['A', 'B', 'C', 'D'];
   buttons.forEach((btn, j) => {
     const isSelected = letters[j] === letter;

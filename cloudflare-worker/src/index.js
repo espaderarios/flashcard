@@ -192,6 +192,119 @@ router.delete('/api/quizzes/:id', async (req, env) => {
   }
 });
 
+// POST submit quiz results (store in a results KV namespace)
+router.post('/api/submit', async (req, env) => {
+  try {
+    const body = await req.json();
+    const { quizId, answers, studentName, studentId, score, totalQuestions } = body;
+
+    // Validation
+    if (!quizId || !answers) {
+      return json(
+        { error: 'quizId and answers are required' },
+        400
+      );
+    }
+
+    // Generate unique result ID
+    const resultId = `result_${quizId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create result object
+    const result = {
+      id: resultId,
+      quizId,
+      answers,
+      studentName: studentName || 'Anonymous',
+      studentId: studentId || 'unknown',
+      score: score || 0,
+      totalQuestions: totalQuestions || answers.length,
+      submittedAt: new Date().toISOString(),
+    };
+
+    // Store in KV with 90-day TTL (7,776,000 seconds)
+    // Using RESULTS namespace if available, otherwise QUIZZES
+    const resultsKV = env.RESULTS || env.QUIZZES;
+    await resultsKV.put(resultId, JSON.stringify(result), {
+      expirationTtl: 7776000,
+    });
+
+    return json(
+      {
+        success: true,
+        result: {
+          id: resultId,
+          quizId,
+          score,
+          totalQuestions,
+          submittedAt: result.submittedAt,
+        },
+      },
+      201
+    );
+  } catch (error) {
+    console.error('Error submitting quiz results:', error);
+    return json(
+      {
+        error: 'Failed to submit quiz results',
+        details: error.message,
+      },
+      500
+    );
+  }
+});
+
+// GET quiz results by ID
+router.get('/api/results/:id', async (req, env) => {
+  try {
+    const { id } = req.params;
+    const resultsKV = env.RESULTS || env.QUIZZES;
+    const result = await resultsKV.get(id, 'json');
+
+    if (!result) {
+      return json({ error: 'Result not found' }, 404);
+    }
+
+    return json({ success: true, result });
+  } catch (error) {
+    console.error('Error fetching result:', error);
+    return json(
+      {
+        error: 'Failed to fetch result',
+        details: error.message,
+      },
+      500
+    );
+  }
+});
+
+// GET all results for a quiz
+router.get('/api/quizzes/:quizId/results', async (req, env) => {
+  try {
+    const { quizId } = req.params;
+    const resultsKV = env.RESULTS || env.QUIZZES;
+    const list = await resultsKV.list({ prefix: `result_${quizId}_` });
+    const results = [];
+
+    for (const item of list.keys) {
+      const result = await resultsKV.get(item.name, 'json');
+      if (result) {
+        results.push(result);
+      }
+    }
+
+    return json({ success: true, quizId, resultCount: results.length, results });
+  } catch (error) {
+    console.error('Error fetching quiz results:', error);
+    return json(
+      {
+        error: 'Failed to fetch quiz results',
+        details: error.message,
+      },
+      500
+    );
+  }
+});
+
 // Handle CORS preflight requests
 router.options('*', () => {
   return new Response(null, {
@@ -211,6 +324,9 @@ router.all('*', () => {
         'GET /api/quizzes/:id',
         'PUT /api/quizzes/:id',
         'DELETE /api/quizzes/:id',
+        'POST /api/submit',
+        'GET /api/results/:id',
+        'GET /api/quizzes/:quizId/results',
       ],
     },
     404
