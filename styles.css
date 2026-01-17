@@ -140,13 +140,16 @@ h1 { font-size: calc(var(--font-size) * 2.2); font-weight: 700; }
 h2 { font-size: calc(var(--font-size) * 1.8); font-weight: 600; }
 h3 { font-size: calc(var(--font-size) * 1.4); font-weight: 600; }
 
+/* Enhanced button base styles */
 button {
   font-family: inherit;
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 500;
+  position: relative;
+  overflow: hidden;
   /* Mobile touch targets */
   min-height: 44px;
   min-width: 44px;
@@ -154,17 +157,20 @@ button {
   /* Better mobile interaction */
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
   touch-action: manipulation;
+  /* Subtle border for better definition */
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-lg);
 }
 
 button:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
   /* Mobile press feedback */
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 0, 0, 0.05);
+  transition: all 0.1s ease;
 }
 
 /* Mobile-specific button adjustments */
@@ -184,18 +190,29 @@ button:disabled {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary-dark) 100%);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
 }
 
 .btn-secondary {
-  background: var(--surface);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--card-bg) 100%);
   color: var(--text);
   border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--card-bg) 0%, var(--surface-hover) 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border-color: var(--border-hover);
 }
 
 /* Mobile-specific optimizations */
@@ -359,21 +376,89 @@ input:focus, textarea:focus, select:focus {
   background: var(--card-bg);
 }
 
+/* Enhanced card styles */
 .card {
   background: var(--card-bg);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
 }
     
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(-20px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
+/* Enhanced animations */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(30px) scale(0.95);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateX(-30px) scale(0.95);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
     
     .fade-in {
       animation: fadeIn 0.6s ease-out;

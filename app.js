@@ -2811,91 +2811,191 @@ document.addEventListener("change", function (e) {
 
 function renderHomeView() {
   return `
-    <div class="mobile-optimized w-full h-full flex items-center justify-center p-4 relative overflow-hidden" style="background: linear-gradient(135deg, var(--background) 0%, var(--surface) 50%, var(--background) 100%); background-image: var(--background-image); background-size: cover; background-position: center;">
-      <!-- Animated background elements -->
-      <div class="absolute inset-0 opacity-5">
-        <div class="absolute top-10 left-10 text-6xl animate-bounce" style="animation-delay: 0s; color: var(--primary);">📚</div>
-        <div class="absolute top-20 right-20 text-4xl animate-pulse" style="animation-delay: 1s; color: var(--secondary);">🃏</div>
-        <div class="absolute bottom-20 left-20 text-5xl animate-bounce" style="animation-delay: 2s; color: var(--accent);">🎯</div>
-        <div class="absolute bottom-10 right-10 text-3xl animate-pulse" style="animation-delay: 0.5s; color: var(--success);">📖</div>
+    <div class="mobile-optimized w-full h-full flex items-center justify-center p-6 relative overflow-hidden" style="background: radial-gradient(ellipse at top, var(--primary) 0%, transparent 50%), radial-gradient(ellipse at bottom, var(--accent) 0%, transparent 50%), linear-gradient(135deg, var(--background) 0%, var(--surface) 50%, var(--background) 100%); background-image: var(--background-image); background-size: cover; background-position: center; min-height: 100vh;">
+      
+      <!-- Enhanced animated background elements -->
+      <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute top-16 left-12 text-7xl animate-bounce" style="animation-delay: 0s; color: var(--primary); opacity: 0.08;">📚</div>
+        <div class="absolute top-24 right-16 text-5xl animate-pulse" style="animation-delay: 1.5s; color: var(--secondary); opacity: 0.06;">🃏</div>
+        <div class="absolute bottom-24 left-16 text-6xl animate-bounce" style="animation-delay: 2.5s; color: var(--accent); opacity: 0.08;">🎯</div>
+        <div class="absolute bottom-16 right-12 text-4xl animate-pulse" style="animation-delay: 1s; color: var(--success); opacity: 0.06;">📖</div>
+        
+        <!-- Floating gradient orbs -->
+        <div class="absolute top-1/4 left-1/4 w-64 h-64 rounded-full animate-pulse" style="background: radial-gradient(circle, var(--primary) 0%, transparent 70%); opacity: 0.05; animation-duration: 4s;"></div>
+        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full animate-pulse" style="background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.03; animation-duration: 6s; animation-delay: 2s;"></div>
       </div>
 
-      <div class="max-w-md w-full text-center fade-in card p-8 relative z-10" style="box-shadow: var(--shadow-xl); background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border);">
+      <!-- Main content card with enhanced glassmorphism -->
+      <div class="max-w-lg w-full text-center fade-in relative z-10" style="animation-duration: 0.8s;">
+        <div class="relative p-10 rounded-3xl" style="
+          background: rgba(255, 255, 255, 0.95); 
+          backdrop-filter: blur(24px) saturate(180%); 
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          box-shadow: 
+            0 32px 64px rgba(0, 0, 0, 0.12),
+            0 16px 32px rgba(0, 0, 0, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        ">
+          
+          <!-- Subtle inner glow -->
+          <div class="absolute inset-0 rounded-3xl opacity-60" style="
+            background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%);
+            pointer-events: none;
+          "></div>
 
-        <div class="mb-8">
-          <div class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 shadow-lg" style="background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); box-shadow: var(--shadow-lg);">
-            <span class="text-3xl">🎓</span>
+          <div class="relative z-10">
+            <!-- Enhanced header section -->
+            <div class="mb-10">
+              <div class="inline-flex items-center justify-center w-24 h-24 rounded-2xl mb-6 relative shadow-xl" style="
+                background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); 
+                box-shadow: 
+                  0 12px 24px rgba(37, 99, 235, 0.25),
+                  0 4px 8px rgba(0, 0, 0, 0.1);
+                transform: translateY(-2px);
+                transition: all 0.3s ease;
+              ">
+                <div class="absolute inset-0 rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-300" style="
+                  background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%);
+                "></div>
+                <span class="text-4xl relative z-10" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">🎓</span>
+              </div>
+              
+              <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-[var(--primary)] via-[var(--accent)] to-[var(--primary)] bg-clip-text text-transparent" style="
+                font-family: var(--font-family-heading); 
+                font-weight: var(--font-weight-bold);
+                letter-spacing: -0.02em;
+                line-height: 1.2;
+              ">
+                Study Hub
+              </h1>
+              <p class="text-xl leading-relaxed" style="
+                color: var(--text-muted); 
+                font-family: var(--font-family);
+                font-weight: var(--font-weight-normal);
+                letter-spacing: 0.01em;
+              ">
+                Master your subjects with interactive flashcards and quizzes
+              </p>
+            </div>
+
+            <!-- Enhanced button grid -->
+            <div class="flex flex-col gap-4 mb-8">
+              
+              <!-- Flashcards button with enhanced design -->
+              <button
+                type="button"
+                onclick="openFlashcards()"
+                class="group relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                style="
+                  min-height: 72px; 
+                  border-radius: var(--radius-lg);
+                  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+                  box-shadow: 
+                    0 8px 16px rgba(37, 99, 235, 0.2),
+                    0 4px 8px rgba(0, 0, 0, 0.1);
+                  font-family: var(--font-family); 
+                  font-weight: var(--font-weight-semibold);
+                "
+              >
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-20 transition-all duration-300" style="
+                  background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+                "></div>
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style="
+                  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15) 0%, transparent 70%);
+                "></div>
+                <div class="flex items-center justify-center gap-4 relative z-10 px-8 py-5">
+                  <span class="text-3xl transform group-hover:scale-110 transition-transform duration-300" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🃏</span>
+                  <span class="text-xl" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Flashcards</span>
+                </div>
+              </button>
+
+              <!-- Teacher Quiz button -->
+              <button
+                onclick="openTeacherQuiz()"
+                class="group relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                style="
+                  min-height: 72px; 
+                  border-radius: var(--radius-lg);
+                  background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-dark) 100%);
+                  box-shadow: 
+                    0 8px 16px rgba(100, 116, 139, 0.2),
+                    0 4px 8px rgba(0, 0, 0, 0.1);
+                  font-family: var(--font-family); 
+                  font-weight: var(--font-weight-semibold);
+                "
+              >
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-20 transition-all duration-300" style="
+                  background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+                "></div>
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style="
+                  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15) 0%, transparent 70%);
+                "></div>
+                <div class="flex items-center justify-center gap-4 relative z-10 px-8 py-5">
+                  <span class="text-3xl transform group-hover:scale-110 transition-transform duration-300" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">👩‍🏫</span>
+                  <span class="text-xl" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Create Quiz</span>
+                </div>
+              </button>
+
+              <!-- Student Quiz button -->
+              <button
+                onclick="openStudentQuiz()"
+                class="group relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                style="
+                  min-height: 72px; 
+                  border-radius: var(--radius-lg);
+                  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+                  box-shadow: 
+                    0 8px 16px rgba(245, 158, 11, 0.2),
+                    0 4px 8px rgba(0, 0, 0, 0.1);
+                  font-family: var(--font-family); 
+                  font-weight: var(--font-weight-semibold);
+                "
+              >
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-20 transition-all duration-300" style="
+                  background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+                "></div>
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style="
+                  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15) 0%, transparent 70%);
+                "></div>
+                <div class="flex items-center justify-center gap-4 relative z-10 px-8 py-5">
+                  <span class="text-3xl transform group-hover:scale-110 transition-transform duration-300" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">👨‍🎓</span>
+                  <span class="text-xl" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Join Quiz</span>
+                </div>
+              </button>
+
+            </div>
+
+            <!-- Enhanced quick stats section -->
+            <div class="pt-8" style="border-top: 1px solid rgba(0, 0, 0, 0.08);">
+              <div class="grid grid-cols-3 gap-6 text-center">
+                <div class="group">
+                  <div class="text-3xl font-bold mb-1 transform group-hover:scale-110 transition-transform duration-300" style="
+                    color: var(--primary); 
+                    font-weight: var(--font-weight-bold);
+                    text-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+                  ">${getTotalSubjects()}</div>
+                  <div class="text-sm font-medium" style="color: var(--text-muted);">Subjects</div>
+                </div>
+                <div class="group">
+                  <div class="text-3xl font-bold mb-1 transform group-hover:scale-110 transition-transform duration-300" style="
+                    color: var(--success); 
+                    font-weight: var(--font-weight-bold);
+                    text-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
+                  ">${getTotalCards()}</div>
+                  <div class="text-sm font-medium" style="color: var(--text-muted);">Cards</div>
+                </div>
+                <div class="group">
+                  <div class="text-3xl font-bold mb-1 transform group-hover:scale-110 transition-transform duration-300" style="
+                    color: var(--accent); 
+                    font-weight: var(--font-weight-bold);
+                    text-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
+                  ">${getTotalQuizzes()}</div>
+                  <div class="text-sm font-medium" style="color: var(--text-muted);">Quizzes</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 class="text-3xl font-bold mb-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] bg-clip-text text-transparent" style="font-family: var(--font-family-heading); font-weight: var(--font-weight-bold);">
-            Study Hub
-          </h1>
-          <p class="text-lg leading-relaxed" style="color: var(--text-muted); font-family: var(--font-family);">
-            Master your subjects with interactive flashcards and quizzes
-          </p>
         </div>
-
-        <div class="flex flex-col gap-4">
-
-          <!-- Flashcards -->
-          <button
-            type="button"
-            onclick="openFlashcards()"
-            class="btn-primary w-full py-6 text-lg font-semibold quiz-option group relative overflow-hidden"
-            style="box-shadow: var(--shadow-lg); min-height: 64px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); font-family: var(--font-family); font-weight: var(--font-weight-semibold);"
-          >
-            <div class="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300" style="background: var(--text);"></div>
-            <div class="flex items-center justify-center gap-3 relative z-10">
-              <span class="text-2xl">🃏</span>
-              <span style="color: var(--text);">Flashcards</span>
-            </div>
-          </button>
-
-          <!-- Teacher Quiz -->
-          <button
-            onclick="openTeacherQuiz()"
-            class="btn-secondary w-full py-6 text-lg font-semibold quiz-option group relative overflow-hidden"
-            style="min-height: 64px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-dark) 100%); box-shadow: var(--shadow); font-family: var(--font-family); font-weight: var(--font-weight-semibold);"
-          >
-            <div class="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300" style="background: var(--text);"></div>
-            <div class="flex items-center justify-center gap-3 relative z-10">
-              <span class="text-2xl">👩‍🏫</span>
-              <span style="color: var(--text);">Create Quiz</span>
-            </div>
-          </button>
-
-          <!-- Student Quiz -->
-          <button
-            onclick="openStudentQuiz()"
-            class="btn-secondary w-full py-6 text-lg font-semibold quiz-option group relative overflow-hidden"
-            style="min-height: 64px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); box-shadow: var(--shadow); font-family: var(--font-family); font-weight: var(--font-weight-semibold);"
-          >
-            <div class="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300" style="background: var(--text);"></div>
-            <div class="flex items-center justify-center gap-3 relative z-10">
-              <span class="text-2xl">👨‍🎓</span>
-              <span style="color: var(--text);">Join Quiz</span>
-            </div>
-          </button>
-
-        </div>
-
-        <!-- Quick stats -->
-        <div class="mt-8 pt-6" style="border-top: 1px solid var(--border);">
-          <div class="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div class="text-2xl font-bold" style="color: var(--primary); font-weight: var(--font-weight-bold);">${getTotalSubjects()}</div>
-              <div class="text-xs" style="color: var(--text-muted);">Subjects</div>
-            </div>
-            <div>
-              <div class="text-2xl font-bold" style="color: var(--success); font-weight: var(--font-weight-bold);">${getTotalCards()}</div>
-              <div class="text-xs" style="color: var(--text-muted);">Cards</div>
-            </div>
-            <div>
-              <div class="text-2xl font-bold" style="color: var(--accent); font-weight: var(--font-weight-bold);">${getTotalQuizzes()}</div>
-              <div class="text-xs" style="color: var(--text-muted);">Quizzes</div>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   `;
