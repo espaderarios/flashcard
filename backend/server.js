@@ -47,6 +47,18 @@ app.use(express.static(parentDir));
 let quizzes = new Map();
 let quizCounter = 1;
 
+// ============= INITIALIZATION CHECKS =============
+
+// Check if GROQ_API_KEY is configured
+if (!process.env.GROQ_API_KEY) {
+  console.warn('⚠️  WARNING: GROQ_API_KEY environment variable is not set!');
+  console.warn('    AI features (card/quiz generation) will not work.');
+  console.warn('    Get an API key from: https://console.groq.com');
+  console.warn('    Set it in your .env file or environment variables.');
+} else {
+  console.log('✅ GROQ_API_KEY is configured');
+}
+
 // ============= HELPER FUNCTIONS =============
 
 /**
@@ -417,7 +429,8 @@ Requirements:
   } catch (error) {
     console.error('AI Generation Error:', error.message);
     res.status(500).json({ 
-      error: error.message || 'Failed to generate quiz questions'
+      error: error.message || 'Failed to generate quiz questions',
+      hint: 'Ensure GROQ_API_KEY environment variable is set with a valid Groq API key from https://console.groq.com'
     });
   }
 });
@@ -498,15 +511,19 @@ Return ONLY valid JSON, no other text.`;
         cards: cards.slice(0, count)
       });
     } catch (apiError) {
-      console.error('Groq API Error:', apiError.response?.status, apiError.response?.data || apiError.message);
-      throw apiError;
+      console.error('Groq API Error:', {
+        status: apiError.response?.status,
+        message: apiError.message,
+        data: apiError.response?.data
+      });
+      throw new Error(`Groq API Error (${apiError.response?.status || 'Unknown'}): ${apiError.response?.data?.error?.message || apiError.message}`);
     }
 
   } catch (error) {
     console.error('Card Generation Error:', error.message);
     res.status(500).json({ 
       error: error.message || 'Failed to generate flashcards',
-      details: error.response?.data?.error?.message || null
+      hint: 'Ensure GROQ_API_KEY environment variable is set with a valid Groq API key from https://console.groq.com'
     });
   }
 });

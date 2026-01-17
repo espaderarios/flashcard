@@ -5,7 +5,6 @@ const CACHE = "flashcards-v" + Date.now();
 const ASSETS = [
   "./",
   "./index.html",
-  ".hintrc",
   "app.js",
   "fonts/BBHBartle-Regular.ttf",
   "fonts/BBHBogle-Regular.ttf",
@@ -24,7 +23,6 @@ const ASSETS = [
   "icons/back.svg",
   "icons/delete.svg",
   "icons/flashcard.svg",
-  "icons/H",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/import.svg",
@@ -62,6 +60,5 @@ const ASSETS = [
   "manifest.json",
   "package.json",
   "styles.css",
-  "sw.js",
   "tailwindcss.js"
 ];

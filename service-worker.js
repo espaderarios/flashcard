@@ -6,7 +6,15 @@ const API_CACHE = 'api-cache-v1';
 // Install and store cache
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => {
+      // Cache assets individually to handle failures gracefully
+      return Promise.allSettled(
+        ASSETS.map(asset => cache.add(asset).catch(err => {
+          console.warn(`Failed to cache ${asset}:`, err.message);
+          return Promise.resolve(); // Continue even if individual assets fail
+        }))
+      );
+    })
   );
   self.skipWaiting();
 });
