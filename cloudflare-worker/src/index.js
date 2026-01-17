@@ -192,6 +192,150 @@ router.delete('/api/quizzes/:id', async (req, env) => {
   }
 });
 
+// POST create backup
+router.post('/api/backup', async (req, env) => {
+  try {
+    const body = await req.json();
+    const { userId, timestamp, data } = body;
+
+    // Validation
+    if (!userId || !data) {
+      return json(
+        { error: 'userId and data are required' },
+        400
+      );
+    }
+
+    // Generate unique backup ID
+    const backupId = 'backup_' + userId + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+    // Create backup object
+    const backup = {
+      id: backupId,
+      userId,
+      timestamp: timestamp || new Date().toISOString(),
+      data,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Store in BACKUPS namespace with 90-day TTL (7,776,000 seconds)
+    const backupsKV = env.BACKUPS || env.QUIZZES;
+    await backupsKV.put(backupId, JSON.stringify(backup), {
+      expirationTtl: 7776000,
+    });
+
+    return json(
+      {
+        success: true,
+        backupId,
+        timestamp: backup.timestamp,
+        message: 'Backup created successfully',
+      },
+      201
+    );
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    return json(
+      {
+        error: 'Failed to create backup',
+        details: error.message,
+      },
+      500
+    );
+  }
+});
+
+// GET backup by ID
+router.get('/api/backup/:id', async (req, env) => {
+  try {
+    const { id } = req.params;
+    const backupsKV = env.BACKUPS || env.QUIZZES;
+    const backup = await backupsKV.get(id, 'json');
+
+    if (!backup) {
+      return json({ error: 'Backup not found' }, 404);
+    }
+
+    return json({ success: true, backup });
+  } catch (error) {
+    console.error('Error fetching backup:', error);
+    return json(
+      {
+        error: 'Failed to fetch backup',
+        details: error.message,
+      },
+      500
+    );
+  }
+});
+
+// DELETE backup
+router.delete('/api/backup/:id', async (req, env) => {
+  try {
+    const { id } = req.params;
+    const backupsKV = env.BACKUPS || env.QUIZZES;
+
+    // Check if exists
+    const existing = await backupsKV.get(id);
+    if (!existing) {
+      return json({ error: 'Backup not found' }, 404);
+    }
+
+    // Delete from KV
+    await backupsKV.delete(id);
+
+    return json({
+      success: true,
+      message: 'Backup deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting backup:', error);
+    return json(
+      {
+        error: 'Failed to delete backup',
+        details: error.message,
+      },
+      500
+    );
+  }
+});
+
+// GET all backups for a user
+router.get('/api/backups/:userId', async (req, env) => {
+  try {
+    const { userId } = req.params;
+    const backupsKV = env.BACKUPS || env.QUIZZES;
+    const list = await backupsKV.list({ prefix: `backup_${userId}_` });
+    const backups = [];
+
+    for (const item of list.keys) {
+      const backup = await backupsKV.get(item.name, 'json');
+      if (backup) {
+        backups.push({
+          id: backup.id,
+          timestamp: backup.timestamp,
+          createdAt: backup.createdAt,
+          size: JSON.stringify(backup.data).length,
+        });
+      }
+    }
+
+    // Sort by timestamp (newest first)
+    backups.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    return json({ success: true, userId, backupCount: backups.length, backups });
+  } catch (error) {
+    console.error('Error fetching user backups:', error);
+    return json(
+      {
+        error: 'Failed to fetch backups',
+        details: error.message,
+      },
+      500
+    );
+  }
+});
+
 // POST submit quiz results (store in a results KV namespace)
 router.post('/api/submit', async (req, env) => {
   try {
@@ -327,6 +471,10 @@ router.all('*', () => {
         'POST /api/submit',
         'GET /api/results/:id',
         'GET /api/quizzes/:quizId/results',
+        'POST /api/backup',
+        'GET /api/backup/:id',
+        'DELETE /api/backup/:id',
+        'GET /api/backups/:userId',
       ],
     },
     404

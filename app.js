@@ -254,6 +254,263 @@ function setCloudflareUrl(url) {
   toast(`✅ Cloudflare backend URL set to: ${url}`);
 }
 
+// ============= CLOUD BACKUP FUNCTIONS =============
+
+/**
+ * Backup all user data to Cloudflare
+ * Includes classes, students, enrollments, and quiz results
+ */
+async function backupAllDataToCloudflare() {
+  try {
+    const cloudflareUrl = getCloudflareUrl();
+    const userId = getUserId();
+    
+    // Collect all important data
+    const backupData = {
+      userId: userId,
+      timestamp: new Date().toISOString(),
+      data: {
+        // Classes data
+        classes: JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]"),
+        
+        // Student enrollments
+        enrollments: JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]"),
+        
+        // Student profiles
+        studentProfiles: JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "{}"),
+        
+        // Quiz drafts
+        quizDrafts: JSON.parse(localStorage.getItem(TEACHER_DRAFT_KEY) || "{}"),
+        
+        // User data
+        userData: JSON.parse(localStorage.getItem('user') || "{}"),
+        
+        // Quiz scores
+        quizScores: JSON.parse(localStorage.getItem('quizScores') || "{}"),
+        
+        // Imported PDFs
+        importedPdfs: JSON.parse(localStorage.getItem('imported-pdfs') || "[]"),
+        
+        // Settings and preferences
+        settings: {
+          backendUrl: getBackendUrl(),
+          cloudflareUrl: getCloudflareUrl(),
+          theme: localStorage.getItem('theme') || 'light',
+          fontSize: localStorage.getItem('fontSize') || '16',
+        }
+      }
+    };
+    
+    const response = await fetch(`${cloudflareUrl}/api/backup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(backupData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Backup failed with status ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Backup successful:', result);
+    
+    // Store backup ID locally for restore functionality
+    localStorage.setItem('lastBackupId', result.backupId);
+    localStorage.setItem('lastBackupTime', backupData.timestamp);
+    
+    showToast('✅ All data backed up successfully!');
+    return result;
+    
+  } catch (error) {
+    console.error('Backup error:', error);
+    showToast('❌ Backup failed: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Restore all data from Cloudflare backup
+ */
+async function restoreAllDataFromCloudflare(backupId) {
+  try {
+    const cloudflareUrl = getCloudflareUrl();
+    
+    const response = await fetch(`${cloudflareUrl}/api/backup/${backupId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Restore failed with status ${response.status}`);
+    }
+    
+    const result = await response.json();
+    const backupData = result.backup;
+    
+    if (!backupData || !backupData.data) {
+      throw new Error('Invalid backup data');
+    }
+    
+    // Restore all data
+    const data = backupData.data;
+    
+    // Restore classes
+    if (data.classes) {
+      localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(data.classes));
+    }
+    
+    // Restore enrollments
+    if (data.enrollments) {
+      localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(data.enrollments));
+    }
+    
+    // Restore student profiles
+    if (data.studentProfiles) {
+      localStorage.setItem(STUDENT_PROFILE_KEY, JSON.stringify(data.studentProfiles));
+    }
+    
+    // Restore quiz drafts
+    if (data.quizDrafts) {
+      localStorage.setItem(TEACHER_DRAFT_KEY, JSON.stringify(data.quizDrafts));
+    }
+    
+    // Restore user data
+    if (data.userData) {
+      localStorage.setItem('user', JSON.stringify(data.userData));
+    }
+    
+    // Restore quiz scores
+    if (data.quizScores) {
+      localStorage.setItem('quizScores', JSON.stringify(data.quizScores));
+    }
+    
+    // Restore imported PDFs
+    if (data.importedPdfs) {
+      localStorage.setItem('imported-pdfs', JSON.stringify(data.importedPdfs));
+    }
+    
+    // Restore settings
+    if (data.settings) {
+      if (data.settings.backendUrl) {
+        setBackendUrl(data.settings.backendUrl);
+      }
+      if (data.settings.cloudflareUrl) {
+        setCloudflareUrl(data.settings.cloudflareUrl);
+      }
+      if (data.settings.theme) {
+        localStorage.setItem('theme', data.settings.theme);
+      }
+      if (data.settings.fontSize) {
+        localStorage.setItem('fontSize', data.settings.fontSize);
+      }
+    }
+    
+    console.log('Restore successful:', backupData.timestamp);
+    showToast(`✅ Data restored from backup (${new Date(backupData.timestamp).toLocaleDateString()})`);
+    
+    // Refresh the app to show restored data
+    setTimeout(() => {
+      renderApp();
+    }, 1000);
+    
+    return result;
+    
+  } catch (error) {
+    console.error('Restore error:', error);
+    showToast('❌ Restore failed: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get list of all backups for current user
+ */
+async function getUserBackups() {
+  try {
+    const cloudflareUrl = getCloudflareUrl();
+    const userId = getUserId();
+    
+    const response = await fetch(`${cloudflareUrl}/api/backups/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch backups with status ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result.backups || [];
+    
+  } catch (error) {
+    console.error('Get backups error:', error);
+    showToast('❌ Failed to fetch backups');
+    return [];
+  }
+}
+
+/**
+ * Delete a specific backup
+ */
+async function deleteBackup(backupId) {
+  try {
+    const cloudflareUrl = getCloudflareUrl();
+    
+    const response = await fetch(`${cloudflareUrl}/api/backup/${backupId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to delete backup with status ${response.status}`);
+    }
+    
+    const result = await response.json();
+    showToast('✅ Backup deleted successfully');
+    return result;
+    
+  } catch (error) {
+    console.error('Delete backup error:', error);
+    showToast('❌ Failed to delete backup');
+    throw error;
+  }
+}
+
+/**
+ * Auto-backup function - can be called periodically
+ */
+async function autoBackup() {
+  try {
+    const lastBackupTime = localStorage.getItem('lastBackupTime');
+    const now = new Date();
+    
+    // Auto-backup every 24 hours
+    if (lastBackupTime) {
+      const lastBackup = new Date(lastBackupTime);
+      const hoursSinceBackup = (now - lastBackup) / (1000 * 60 * 60);
+      
+      if (hoursSinceBackup < 24) {
+        console.log('Auto-backup skipped - recent backup exists');
+        return;
+      }
+    }
+    
+    await backupAllDataToCloudflare();
+    console.log('Auto-backup completed');
+    
+  } catch (error) {
+    console.error('Auto-backup failed:', error);
+  }
+}
+
 // ============= CLOUDFLARE QUIZ OPERATIONS =============
 
 /**
@@ -5023,19 +5280,29 @@ function renderTeacherQuizList() {
                style="background: var(--card-bg); color: var(--text); border-radius: var(--radius);">
             <h3 class="text-xl font-semibold mb-6" style="color: var(--text);">📊 Item Analysis Dashboard</h3>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div class="card p-4 text-center">
-                <div class="text-2xl font-bold text-primary mb-2">85%</div>
-                <div class="text-sm text-text-muted">Average Score</div>
+            <div class="mt-8 pt-6" style="border-top: 1px solid var(--border);">
+              <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div class="text-2xl font-bold" style="color: var(--primary); font-weight: var(--font-weight-bold);">${getTotalSubjects()}</div>
+                  <div class="text-xs" style="color: var(--text-muted);">Subjects</div>
+                </div>
+                <div>
+                  <div class="text-2xl font-bold" style="color: var(--success); font-weight: var(--font-weight-bold);">${getTotalCards()}</div>
+                  <div class="text-xs" style="color: var(--text-muted);">Cards</div>
+                </div>
+                <div>
+                  <div class="text-2xl font-bold" style="color: var(--accent); font-weight: var(--font-weight-bold);">${getTotalQuizzes()}</div>
+                  <div class="text-xs" style="color: var(--text-muted);">Quizzes</div>
+                </div>
               </div>
-              <div class="card p-4 text-center">
-                <div class="text-2xl font-bold text-success mb-2">12</div>
-                <div class="text-sm text-text-muted">Total Quizzes</div>
-              </div>
-              <div class="card p-4 text-center">
-                <div class="text-2xl font-bold text-warning mb-2">3.2</div>
-                <div class="text-sm text-text-muted">Avg Difficulty</div>
-              </div>
+            </div>
+
+            <div class="mt-6">
+              <button onclick="currentView='backup'; renderApp();" 
+                      class="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105"
+                      style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface-hover) 100%); color: var(--text); border: 1px solid var(--border);">
+                📦 Backup & Restore
+              </button>
             </div>
 
             <div class="card p-4 mb-6">
@@ -7290,6 +7557,8 @@ function renderApp() {
     content = renderClassQuizView();
   } else if (currentView === "quiz-result") {
     content = renderQuizResultView();
+  } else if (currentView === "backup") {
+    content = renderBackupView();
   } else if (currentView === "customize") {
     content = renderCustomizationPanel();
   }
@@ -8419,6 +8688,260 @@ function toggleTimerControls(value) {
   renderApp();
 }
 
+
+function renderBackupView() {
+  return `
+    <div class="mobile-optimized w-full h-full p-4">
+      <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+          <button onclick="currentView='home'; renderApp();" 
+                  class="p-2 rounded-lg transition-all duration-200 hover:scale-105" 
+                  style="background: var(--surface); color: var(--text);">
+            <span class="text-xl">⬅️</span>
+          </button>
+          <h2 class="text-2xl font-bold" style="color: var(--text);">📦 Backup & Restore</h2>
+          <div class="w-10"></div>
+        </div>
+
+        <!-- Backup Status -->
+        <div class="card p-4 mb-6" style="background: var(--card-bg); border-radius: 12px;">
+          <h3 class="text-lg font-semibold mb-3" style="color: var(--text);">Backup Status</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span class="text-sm opacity-70" style="color: var(--text-muted);">Last Backup:</span>
+              <div class="font-medium" style="color: var(--text);" id="last-backup-time">
+                ${localStorage.getItem('lastBackupTime') ? new Date(localStorage.getItem('lastBackupTime')).toLocaleString() : 'Never'}
+              </div>
+            </div>
+            <div>
+              <span class="text-sm opacity-70" style="color: var(--text-muted);">Backup ID:</span>
+              <div class="font-medium text-sm" style="color: var(--text);" id="last-backup-id">
+                ${localStorage.getItem('lastBackupId') || 'No backup'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <!-- Create Backup -->
+          <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
+            <h3 class="text-lg font-semibold mb-2" style="color: var(--text);">📤 Create Backup</h3>
+            <p class="text-sm mb-4 opacity-80" style="color: var(--text);">
+              Backup all your classes, students, quiz data, and settings to the cloud.
+            </p>
+            <button onclick="createBackup()" 
+                    class="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105"
+                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;">
+              🚀 Backup Now
+            </button>
+          </div>
+
+          <!-- Restore Backup -->
+          <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
+            <h3 class="text-lg font-semibold mb-2" style="color: var(--text);">📥 Restore Backup</h3>
+            <p class="text-sm mb-4 opacity-80" style="color: var(--text);">
+              Restore your data from a previous cloud backup.
+            </p>
+            <button onclick="loadBackups()" 
+                    class="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105"
+                    style="background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%); color: white;">
+              🔄 View Backups
+            </button>
+          </div>
+        </div>
+
+        <!-- Auto-backup Settings -->
+        <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
+          <h3 class="text-lg font-semibold mb-3" style="color: var(--text);">⚙️ Auto-backup Settings</h3>
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-medium" style="color: var(--text);">Automatic Daily Backup</div>
+              <div class="text-sm opacity-70" style="color: var(--text-muted);">
+                Automatically backup your data every 24 hours
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="auto-backup-toggle" class="sr-only peer" 
+                     ${localStorage.getItem('autoBackup') === 'true' ? 'checked' : ''}>
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer 
+                          peer-checked:after:translate-x-full peer-checked:after:border-white 
+                          after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                          after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
+                          peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Backups List (Hidden by default) -->
+        <div id="backups-list" class="hidden mt-6">
+          <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
+            <h3 class="text-lg font-semibold mb-4" style="color: var(--text);">📋 Available Backups</h3>
+            <div id="backups-container" class="space-y-3">
+              <div class="text-center py-8" style="color: var(--text-muted);">
+                <div class="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent mx-auto mb-3" 
+                     style="border-color: var(--primary); border-top-color: transparent;"></div>
+                Loading backups...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Backup management functions
+async function createBackup() {
+  try {
+    showToast('🔄 Creating backup...');
+    await backupAllDataToCloudflare();
+    
+    // Update UI
+    const lastBackupTime = document.getElementById('last-backup-time');
+    const lastBackupId = document.getElementById('last-backup-id');
+    
+    if (lastBackupTime) {
+      lastBackupTime.textContent = new Date().toLocaleString();
+    }
+    if (lastBackupId) {
+      lastBackupId.textContent = localStorage.getItem('lastBackupId') || 'No backup';
+    }
+    
+  } catch (error) {
+    console.error('Backup creation failed:', error);
+  }
+}
+
+async function loadBackups() {
+  try {
+    const backupsList = document.getElementById('backups-list');
+    const backupsContainer = document.getElementById('backups-container');
+    
+    // Show the backups section
+    backupsList.classList.remove('hidden');
+    
+    // Show loading state
+    backupsContainer.innerHTML = `
+      <div class="text-center py-8" style="color: var(--text-muted);">
+        <div class="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent mx-auto mb-3" 
+             style="border-color: var(--primary); border-top-color: transparent;"></div>
+        Loading backups...
+      </div>
+    `;
+    
+    // Fetch backups
+    const backups = await getUserBackups();
+    
+    if (backups.length === 0) {
+      backupsContainer.innerHTML = `
+        <div class="text-center py-8" style="color: var(--text-muted);">
+          <div class="text-4xl mb-3">📭</div>
+          <div>No backups found</div>
+          <div class="text-sm mt-2">Create your first backup to get started</div>
+        </div>
+      `;
+      return;
+    }
+    
+    // Render backups
+    backupsContainer.innerHTML = backups.map(backup => `
+      <div class="p-4 rounded-lg border" style="background: var(--surface); border-color: var(--border);">
+        <div class="flex items-center justify-between">
+          <div class="flex-1">
+            <div class="font-medium" style="color: var(--text);">
+              ${new Date(backup.timestamp).toLocaleString()}
+            </div>
+            <div class="text-sm opacity-70" style="color: var(--text-muted);">
+              Size: ${(backup.size / 1024).toFixed(1)} KB • ID: ${backup.id.slice(-8)}
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="restoreFromBackup('${backup.id}')" 
+                    class="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
+                    style="background: var(--success); color: white;">
+              🔄 Restore
+            </button>
+            <button onclick="deleteBackupById('${backup.id}')" 
+                    class="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
+                    style="background: var(--danger); color: white;">
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    
+  } catch (error) {
+    console.error('Load backups failed:', error);
+    const backupsContainer = document.getElementById('backups-container');
+    if (backupsContainer) {
+      backupsContainer.innerHTML = `
+        <div class="text-center py-8" style="color: var(--text-muted);">
+          <div class="text-4xl mb-3">❌</div>
+          <div>Failed to load backups</div>
+          <div class="text-sm mt-2">${error.message}</div>
+        </div>
+      `;
+    }
+  }
+}
+
+async function restoreFromBackup(backupId) {
+  if (!confirm('⚠️ This will replace all your current data with the selected backup. Are you sure?')) {
+    return;
+  }
+  
+  try {
+    await restoreAllDataFromCloudflare(backupId);
+    
+    // Update UI
+    const lastBackupTime = document.getElementById('last-backup-time');
+    const lastBackupId = document.getElementById('last-backup-id');
+    
+    if (lastBackupTime) {
+      lastBackupTime.textContent = new Date().toLocaleString();
+    }
+    if (lastBackupId) {
+      lastBackupId.textContent = backupId;
+    }
+    
+  } catch (error) {
+    console.error('Restore failed:', error);
+  }
+}
+
+async function deleteBackupById(backupId) {
+  if (!confirm('🗑️ Are you sure you want to delete this backup? This action cannot be undone.')) {
+    return;
+  }
+  
+  try {
+    await deleteBackup(backupId);
+    await loadBackups(); // Refresh the list
+  } catch (error) {
+    console.error('Delete backup failed:', error);
+  }
+}
+
+// Auto-backup toggle handler
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'auto-backup-toggle') {
+    localStorage.setItem('autoBackup', e.target.checked);
+    if (e.target.checked) {
+      showToast('✅ Auto-backup enabled');
+      autoBackup(); // Try to backup immediately
+    } else {
+      showToast('❌ Auto-backup disabled');
+    }
+  }
+});
+
+// Trigger auto-backup on app load if enabled
+if (localStorage.getItem('autoBackup') === 'true') {
+  setTimeout(autoBackup, 5000); // Wait 5 seconds after app loads
+}
 
 function renderQuizResultView() {
   const primary = config.primary_color;
