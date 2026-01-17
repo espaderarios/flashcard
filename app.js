@@ -36,6 +36,33 @@ function getStudentProfile() {
   return profile || window.currentStudent || {};
 }
 
+function getStudentById(studentId) {
+  // First, try to find the student in enrollment data (which now includes names)
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  const enrollment = enrolledClasses.find(e => e.studentId === studentId && e.studentName);
+  
+  if (enrollment && enrollment.studentName) {
+    return {
+      id: studentId,
+      name: enrollment.studentName
+    };
+  }
+  
+  // Try to get from individual student profile (current student)
+  if (window.currentStudent && window.currentStudent.id === studentId) {
+    return window.currentStudent;
+  }
+  
+  // Try to get from stored student profile
+  const profile = JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "null");
+  if (profile && profile.id === studentId) {
+    return profile;
+  }
+  
+  // Fallback to unknown student
+  return { id: studentId, name: 'Unknown Student' };
+}
+
 // Class Storage
 function saveClass(classData) {
   const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
@@ -99,6 +126,7 @@ function enrollStudentInClass(classCode) {
     className: classToEnroll.name,
     teacherId: classToEnroll.teacherId,
     studentId: studentId,
+    studentName: window.currentStudent?.name || 'Unknown Student',
     enrolledAt: new Date().toISOString()
   });
   
@@ -3741,9 +3769,14 @@ function renderStudentScoresView(classId) {
   let html = '<div style="overflow-x: auto;">';
   
   enrollments.forEach(enrollment => {
+    const student = getStudentById(enrollment.studentId);
     html += `<div style="margin-bottom: 30px; padding: 15px; background: var(--input-bg); border-radius: 8px;">`;
     html += `<h4 style="font-weight: bold; margin-bottom: 12px; color: var(--on-surface);">
-      Student: ${enrollment.studentId || 'Unknown'}
+      Student: <span style="color: var(--primary); cursor: pointer; text-decoration: underline;" 
+                   onclick="openStudentInfoModal('${enrollment.studentId}')"
+                   title="Click to view student details">
+                   ${student.name || enrollment.studentId || 'Unknown'}
+                 </span>
     </h4>`;
     html += '<table style="width: 100%; border-collapse: collapse;">';
     html += '<thead>';
@@ -3921,6 +3954,91 @@ function openStudentScoresModal(classId) {
     ${html}
     <button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold;"
              onclick="document.querySelector('[data-scores-overlay]').remove()">Close</button>
+  </div>`;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  document.body.appendChild(overlay);
+}
+
+function openStudentInfoModal(studentId) {
+  const student = getStudentById(studentId);
+  const enrollments = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]")
+    .filter(e => e.studentId === studentId);
+  
+  // Get class names for enrolled classes
+  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const enrolledClassNames = enrollments.map(e => {
+    const cls = allClasses.find(c => c.id === e.classId);
+    return cls ? cls.name : 'Unknown Class';
+  });
+
+  const overlay = document.createElement('div');
+  overlay.setAttribute('data-student-info-overlay', 'true');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+  overlay.innerHTML = `<div style="width: 95%; max-width: 500px; background: var(--surface); color: var(--on-surface); padding: 24px; border-radius: 12px; margin: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h3 style="font-size: 20px; font-weight: bold; margin: 0;">👤 Student Information</h3>
+      <button onclick="document.querySelector('[data-student-info-overlay]').remove()" 
+              style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--on-surface-variant);">×</button>
+    </div>
+    
+    <div style="space-y: 16px;">
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Student ID</label>
+        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px; font-family: monospace;">${student.id}</div>
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Name</label>
+        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.name || 'Not provided'}</div>
+      </div>
+      
+      ${student.email ? `
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Email</label>
+        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.email}</div>
+      </div>
+      ` : ''}
+      
+      ${student.school ? `
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">School</label>
+        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.school}</div>
+      </div>
+      ` : ''}
+      
+      ${student.grade ? `
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Grade Level</label>
+        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.grade}</div>
+      </div>
+      ` : ''}
+      
+      ${student.profilePictureUrl ? `
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Profile Picture</label>
+        <img src="${student.profilePictureUrl}" alt="Profile" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
+      </div>
+      ` : ''}
+      
+      ${student.googleEmail ? `
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Google Account</label>
+        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">✅ ${student.googleEmail}</div>
+      </div>
+      ` : ''}
+      
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Enrolled Classes (${enrolledClassNames.length})</label>
+        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">
+          ${enrolledClassNames.length > 0 ? enrolledClassNames.join(', ') : 'No classes enrolled'}
+        </div>
+      </div>
+    </div>
+    
+    <button style="width: 100%; margin-top: 20px; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold; border: none;"
+             onclick="document.querySelector('[data-student-info-overlay]').remove()">Close</button>
   </div>`;
   overlay.onclick = (e) => {
     if (e.target === overlay) overlay.remove();
