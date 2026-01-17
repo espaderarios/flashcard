@@ -489,11 +489,136 @@ html {
   }
 }
 
-/* Enhanced bottom navigation */
-.bottom-nav {
-  backdrop-filter: blur(20px) saturate(180%);
-  background: rgba(255, 255, 255, 0.9);
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+/* Enhanced PDF Viewer Styles */
+.pdf-viewer-container {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pdf-viewer-container:fullscreen {
+  background: #000;
+  padding: 0;
+  margin: 0;
+}
+
+.pdf-viewer-container:fullscreen .pdf-content {
+  background: #000 !important;
+  min-height: 100vh !important;
+  max-height: 100vh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.pdf-viewer-container:fullscreen #pdf-canvas {
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 auto !important;
+  display: block !important;
+  background: #000;
+}
+
+.pdf-viewer-container:fullscreen .pdf-header,
+.pdf-viewer-container:fullscreen .pdf-toolbar,
+.pdf-viewer-container:fullscreen .pdf-footer {
+  display: none !important;
+}
+
+/* Enhanced PDF content area */
+.pdf-content {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.pdf-content:fullscreen {
+  overflow: hidden !important;
+}
+
+/* Fullscreen button enhancements */
+.pdf-viewer-container:fullscreen {
+  position: relative;
+}
+
+.pdf-viewer-container:fullscreen::after {
+  content: 'Press ESC to exit fullscreen';
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 10000;
+  opacity: 0;
+  animation: fadeInOut 0.5s ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; }
+  20%, 80% { opacity: 1; }
+}
+
+/* Enhanced canvas styling for better readability */
+#pdf-canvas {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+/* PDF loading overlay enhancement */
+.pdf-loading {
+  backdrop-filter: blur(8px) saturate(180%);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* PDF toolbar enhancements */
+.pdf-toolbar {
+  backdrop-filter: blur(12px) saturate(180%);
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* PDF header and footer enhancements */
+.pdf-header,
+.pdf-footer {
+  backdrop-filter: blur(12px) saturate(180%);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Mobile fullscreen optimizations */
+@media (max-width: 768px) {
+  .pdf-viewer-container:fullscreen::after {
+    top: 10px;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+  
+  .pdf-viewer-container:fullscreen #pdf-canvas {
+    object-fit: contain;
+    width: 100vw;
+    height: 100vh;
+  }
+}
+
+/* Touch gestures for fullscreen */
+.pdf-content:fullscreen {
+  touch-action: pan-y pinch-zoom;
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .pdf-viewer-container:fullscreen #pdf-canvas {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
 }
 
 /* Improved form inputs */

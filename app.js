@@ -2549,17 +2549,201 @@ function zoomOut() {
   renderPage(pageNum);
 }
 
-// Fullscreen toggle
+// Enhanced Fullscreen toggle with true fullscreen mode
+let isFullscreenMode = false;
+
 function toggleFullscreen() {
   const container = document.querySelector(".pdf-viewer-container");
   if (!container) return;
 
   if (!document.fullscreenElement) {
+    // Enter fullscreen mode
     container.requestFullscreen().catch(err => console.log(err));
+    isFullscreenMode = true;
+    
+    // Hide all UI elements after a short delay
+    setTimeout(() => {
+      const pdfHeader = container.querySelector('.pdf-header');
+      const pdfToolbar = container.querySelector('#pdf-toolbar');
+      const pdfFooter = container.querySelector('.pdf-footer');
+      const pdfContent = container.querySelector('#pdf-content');
+      
+      if (pdfHeader) pdfHeader.style.display = 'none';
+      if (pdfToolbar) pdfToolbar.style.display = 'none';
+      if (pdfFooter) pdfFooter.style.display = 'none';
+      
+      // Make PDF content take full viewport
+      if (pdfContent) {
+        pdfContent.style.minHeight = '100vh';
+        pdfContent.style.maxHeight = '100vh';
+        pdfContent.style.background = '#000';
+        pdfContent.style.padding = '0';
+        pdfContent.style.margin = '0';
+        pdfContent.style.borderRadius = '0';
+        pdfContent.style.boxShadow = 'none';
+      }
+      
+      // Hide canvas container padding
+      const canvasContainer = container.querySelector('.p-2.sm\\:p-4');
+      if (canvasContainer) {
+        canvasContainer.style.padding = '0';
+      }
+      
+      // Make canvas take full screen
+      const canvas = document.getElementById('pdf-canvas');
+      if (canvas) {
+        canvas.style.maxWidth = '100vw';
+        canvas.style.maxHeight = '100vh';
+        canvas.style.borderRadius = '0';
+        canvas.style.boxShadow = 'none';
+        canvas.style.margin = '0 auto';
+        canvas.style.display = 'block';
+      }
+      
+      // Hide loading indicator if visible
+      const loading = document.getElementById('pdf-loading');
+      if (loading) loading.style.display = 'none';
+      
+      showToast('Entered fullscreen mode - Press ESC to exit');
+    }, 300);
+    
   } else {
+    // Exit fullscreen mode
     document.exitFullscreen();
+    isFullscreenMode = false;
+    
+    // Restore all UI elements
+    setTimeout(() => {
+      const pdfHeader = container.querySelector('.pdf-header');
+      const pdfToolbar = container.querySelector('#pdf-toolbar');
+      const pdfFooter = container.querySelector('.pdf-footer');
+      const pdfContent = container.querySelector('#pdf-content');
+      
+      if (pdfHeader) pdfHeader.style.display = '';
+      if (pdfToolbar) pdfToolbar.style.display = '';
+      if (pdfFooter) pdfFooter.style.display = '';
+      
+      // Restore PDF content styling
+      if (pdfContent) {
+        pdfContent.style.minHeight = '';
+        pdfContent.style.maxHeight = '';
+        pdfContent.style.background = '';
+        pdfContent.style.padding = '';
+        pdfContent.style.margin = '';
+        pdfContent.style.borderRadius = '';
+        pdfContent.style.boxShadow = '';
+      }
+      
+      // Restore canvas container padding
+      const canvasContainer = container.querySelector('.p-2.sm\\:p-4');
+      if (canvasContainer) {
+        canvasContainer.style.padding = '';
+      }
+      
+      // Restore canvas styling
+      const canvas = document.getElementById('pdf-canvas');
+      if (canvas) {
+        canvas.style.maxWidth = '';
+        canvas.style.maxHeight = '';
+        canvas.style.borderRadius = '';
+        canvas.style.boxShadow = '';
+        canvas.style.margin = '';
+        canvas.style.display = '';
+      }
+      
+      showToast('Exited fullscreen mode');
+    }, 100);
   }
 }
+
+// Add keyboard navigation support for fullscreen mode
+document.addEventListener('keydown', (e) => {
+  if (!isFullscreenMode) return;
+  
+  switch(e.key) {
+    case 'Escape':
+      // Exit fullscreen
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
+      break;
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      e.preventDefault();
+      previousPage();
+      break;
+    case 'ArrowRight':
+    case 'ArrowDown':
+    case ' ':
+      e.preventDefault();
+      nextPage();
+      break;
+    case '+':
+    case '=':
+      e.preventDefault();
+      zoomIn();
+      break;
+    case '-':
+    case '_':
+      e.preventDefault();
+      zoomOut();
+      break;
+    case '0':
+      e.preventDefault();
+      scale = 1.0;
+      renderPage(pageNum);
+      showToast('Zoom reset to 100%');
+      break;
+  }
+});
+
+// Add fullscreen change listener to handle ESC key and browser exit
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && isFullscreenMode) {
+    // User exited fullscreen via ESC or browser controls
+    isFullscreenMode = false;
+    
+    // Restore UI elements
+    const container = document.querySelector(".pdf-viewer-container");
+    if (container) {
+      setTimeout(() => {
+        const pdfHeader = container.querySelector('.pdf-header');
+        const pdfToolbar = container.querySelector('#pdf-toolbar');
+        const pdfFooter = container.querySelector('.pdf-footer');
+        const pdfContent = container.querySelector('#pdf-content');
+        
+        if (pdfHeader) pdfHeader.style.display = '';
+        if (pdfToolbar) pdfToolbar.style.display = '';
+        if (pdfFooter) pdfFooter.style.display = '';
+        
+        if (pdfContent) {
+          pdfContent.style.minHeight = '';
+          pdfContent.style.maxHeight = '';
+          pdfContent.style.background = '';
+          pdfContent.style.padding = '';
+          pdfContent.style.margin = '';
+          pdfContent.style.borderRadius = '';
+          pdfContent.style.boxShadow = '';
+        }
+        
+        const canvasContainer = container.querySelector('.p-2.sm\\:p-4');
+        if (canvasContainer) {
+          canvasContainer.style.padding = '';
+        }
+        
+        const canvas = document.getElementById('pdf-canvas');
+        if (canvas) {
+          canvas.style.maxWidth = '';
+          canvas.style.maxHeight = '';
+          canvas.style.borderRadius = '';
+          canvas.style.boxShadow = '';
+          canvas.style.margin = '';
+          canvas.style.display = '';
+        }
+      }, 100);
+    }
+  }
+});
 
 function toggleReadingMode() {
   readingMode = !readingMode;
