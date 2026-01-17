@@ -18,8 +18,21 @@ echo ""
 # Check if backend .env exists
 if [ ! -f backend/.env ]; then
     echo "📝 Creating backend/.env from template..."
-    cp backend/.env.example backend/.env
-    echo "⚠️  Please edit backend/.env and add your GROQ_API_KEY"
+    if [ -f backend/.env.example ]; then
+        cp backend/.env.example backend/.env
+    else
+        cat > backend/.env << EOF
+# Groq API Configuration
+# Get your API key from: https://console.groq.com
+GROQ_API_KEY=
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+EOF
+    fi
+    echo "⚠️  ACTION REQUIRED: Edit backend/.env and add your GROQ_API_KEY"
+    echo "   Get a free API key from: https://console.groq.com"
     echo ""
 fi
 
