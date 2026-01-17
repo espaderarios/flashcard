@@ -39,7 +39,8 @@ self.addEventListener("fetch", event => {
 
   // Skip API calls to backend - cache them separately (only GET requests)
   if (url.origin.includes("quiz-backend.espaderario.workers.dev") || 
-      url.origin.includes("flashcard.espaderario.workers.dev")) {
+      url.origin.includes("flashcard.espaderario.workers.dev") ||
+      url.origin.includes("flashcard-worker.espaderarios.workers.dev")) {
     // Only cache GET requests, let POST/PUT/DELETE go through
     if (event.request.method === 'GET') {
       event.respondWith(

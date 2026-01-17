@@ -85,7 +85,7 @@ function getBackendUrl() {
 
 // Get Cloudflare backend URL for quiz submission and results
 function getCloudflareUrl() {
-  return localStorage.getItem('cloudflareUrl') || 'https://flashcard.espaderario.workers.dev';
+  return localStorage.getItem('cloudflareUrl') || 'https://flashcard-worker.espaderarios.workers.dev';
 }
 
 // Set backend URL (can be called to configure)
