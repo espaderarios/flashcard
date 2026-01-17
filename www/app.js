@@ -3938,12 +3938,146 @@ async function generatePDFQuiz() {
   }
 }
 
+// ============= ITEM ANALYSIS - PER QUIZ =============
+
 function openItemAnalysisModal() {
   document.getElementById("item-analysis-modal").classList.remove("hidden");
+  
+  // Populate with real data
+  requestAnimationFrame(() => {
+    renderQuizSelector();
+  });
 }
 
 function closeItemAnalysisModal() {
   document.getElementById("item-analysis-modal").classList.add("hidden");
+}
+
+function renderQuizSelector() {
+  const container = document.getElementById('question-performance');
+  if (!container) return;
+  
+  const allScores = JSON.parse(localStorage.getItem('studentQuizScores') || '[]');
+  
+  if (allScores.length === 0) {
+    container.innerHTML = '<p style="color: var(--on-surface-variant); text-align: center; padding: 20px;">No quiz attempts found.</p>';
+    return;
+  }
+  
+  // Get unique quizzes
+  const quizzes = {};
+  allScores.forEach(score => {
+    if (!quizzes[score.quizId]) {
+      quizzes[score.quizId] = { quizId: score.quizId, attempts: [] };
+    }
+    quizzes[score.quizId].attempts.push(score);
+  });
+  
+  // Show quiz selector
+  let html = '<div style="margin-bottom: 20px;"><h4 style="font-weight: bold; margin-bottom: 10px;">Select a Quiz to Analyze:</h4></div>';
+  
+  Object.values(quizzes).forEach(quiz => {
+    const studentCount = new Set(quiz.attempts.map(a => a.studentId)).size;
+    const avgScore = Math.round(quiz.attempts.reduce((sum, a) => sum + (a.percentage || 0), 0) / quiz.attempts.length);
+    
+    html += `
+      <div class="p-4 mb-3 rounded-lg cursor-pointer hover:scale-[1.02] transition-all" 
+           style="background: var(--surface); border-left: 4px solid var(--primary);"
+           onclick="calculateItemAnalysisForQuiz('${quiz.quizId}')">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="font-bold text-lg">${quiz.quizId}</div>
+            <div class="text-sm" style="color: var(--on-surface-variant);">
+              ${studentCount} student${studentCount !== 1 ? 's' : ''} • ${quiz.attempts.length} attempt${quiz.attempts.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-2xl font-bold" style="color: var(--primary);">${avgScore}%</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+function calculateItemAnalysisForQuiz(quizId) {
+  // Find the quiz questions
+  let quiz = null;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
+      const stored = JSON.parse(localStorage.getItem(key) || '[]');
+      quiz = stored.find(q => q.quizId === quizId);
+      if (quiz) break;
+    }
+  }
+  
+  if (!quiz?.questions) {
+    toast("⚠️ Quiz questions not found");
+    return;
+  }
+  
+  // Get highest score per student for this quiz
+  const allScores = JSON.parse(localStorage.getItem('studentQuizScores') || '[]');
+  const studentBestScores = {};
+  
+  allScores.filter(s => s.quizId === quizId).forEach(score => {
+    if (!studentBestScores[score.studentId] || score.percentage > studentBestScores[score.studentId].percentage) {
+      studentBestScores[score.studentId] = score;
+    }
+  });
+  
+  const bestScores = Object.values(studentBestScores);
+  
+  // Calculate per-question statistics
+  const questionStats = quiz.questions.map((q, index) => {
+    const correctCount = bestScores.filter(s => s.score > index).length;
+    const percentage = Math.round((correctCount / bestScores.length) * 100);
+    
+    return {
+      questionNumber: index + 1,
+      question: q.question,
+      correctCount,
+      totalAnswers: bestScores.length,
+      percentage,
+      difficulty: percentage >= 70 ? 'Easy' : percentage >= 50 ? 'Medium' : 'Hard'
+    };
+  });
+  
+  // Render results
+  const container = document.getElementById('question-performance');
+  let html = `
+    <button onclick="renderQuizSelector()" style="padding: 8px 16px; background: var(--surface-variant); border-radius: 6px; margin-bottom: 15px;">
+      ← Back
+    </button>
+    <h4 style="font-weight: bold; font-size: 18px; margin-bottom: 15px;">${quizId}</h4>
+  `;
+  
+  questionStats.forEach(stat => {
+    const color = stat.percentage >= 70 ? 'var(--success)' : stat.percentage >= 50 ? 'var(--warning)' : 'var(--error)';
+    
+    html += `
+      <div class="p-3 rounded-lg mb-2" style="background: var(--surface);">
+        <div class="flex justify-between">
+          <div style="flex: 1;">
+            <div class="font-medium">Question ${stat.questionNumber}</div>
+            <div class="text-sm" style="color: var(--on-surface-variant); margin-top: 4px;">${stat.question}</div>
+            <div class="text-xs mt-2">Difficulty: ${stat.difficulty}</div>
+          </div>
+          <div class="text-right">
+            <div class="font-semibold" style="color: ${color};" data-percent="${stat.percentage}" data-fraction="${stat.correctCount}/${stat.totalAnswers}">
+              ${stat.percentage}%
+            </div>
+            <div class="text-sm">${stat.correctCount}/${stat.totalAnswers}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
 }
 
 function exportAnalysis() {
