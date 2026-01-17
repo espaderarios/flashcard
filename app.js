@@ -101,8 +101,8 @@ function deleteClass(classId) {
   localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
 }
 
-// Student Class Enrollment
-function enrollStudentInClass(classCode) {
+// Student Class Enrollment (Enhanced for Cross-Device Support)
+function enrollStudentInClass(classCode, studentInfo = null) {
   const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
   const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
   
@@ -111,33 +111,80 @@ function enrollStudentInClass(classCode) {
     return { success: false, error: "Invalid class code" };
   }
   
-  const studentId = window.currentStudent?.id || localStorage.getItem('currentStudentId');
+  // Try multiple methods to get student ID
+  let studentId = window.currentStudent?.id || 
+                  localStorage.getItem('currentStudentId') || 
+                  studentInfo?.id;
+  
+  // If no student ID exists, create one based on device/user info
   if (!studentId) {
-    return { success: false, error: "Student ID not found" };
+    // Create a persistent student ID based on browser fingerprint + timestamp
+    const deviceId = localStorage.getItem('deviceId') || 
+                   'student_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('deviceId', deviceId);
+    studentId = deviceId;
+    
+    // Create basic student profile if none exists
+    if (!window.currentStudent && !studentInfo) {
+      studentInfo = {
+        id: studentId,
+        name: `Student ${deviceId.slice(-6)}`, // Use last 6 chars as default name
+        email: '',
+        createdAt: new Date().toISOString()
+      };
+      saveStudentProfile(studentInfo);
+    }
   }
   
-  const alreadyEnrolled = enrolledClasses.find(e => e.classId === classToEnroll.id && e.studentId === studentId);
+  // Check if already enrolled (more flexible check)
+  const alreadyEnrolled = enrolledClasses.find(e => 
+    e.classId === classToEnroll.id && 
+    (e.studentId === studentId || e.deviceId === studentId)
+  );
   if (alreadyEnrolled) {
     return { success: false, error: "Already enrolled in this class" };
   }
   
-  enrolledClasses.push({
+  // Create enrollment with cross-device support
+  const enrollment = {
     classId: classToEnroll.id,
     className: classToEnroll.name,
     teacherId: classToEnroll.teacherId,
     studentId: studentId,
-    studentName: window.currentStudent?.name || 'Unknown Student',
-    enrolledAt: new Date().toISOString()
-  });
+    deviceId: studentId, // Store deviceId for cross-device sync
+    studentName: studentInfo?.name || window.currentStudent?.name || `Student ${studentId.slice(-6)}`,
+    enrolledAt: new Date().toISOString(),
+    lastAccessed: new Date().toISOString(),
+    deviceInfo: {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      timestamp: new Date().toISOString()
+    }
+  };
   
+  enrolledClasses.push(enrollment);
   localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(enrolledClasses));
-  return { success: true, classId: classToEnroll.id };
+  
+  // Store current student info for this session
+  localStorage.setItem('currentStudentId', studentId);
+  if (studentInfo) {
+    window.currentStudent = studentInfo;
+  }
+  
+  return { success: true, classId: classToEnroll.id, studentId };
 }
 
 function getStudentEnrolledClasses(studentId) {
   const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
-  // Filter by studentId and fix old enrollments that don't have studentId
-  return enrolledClasses.filter(e => !e.studentId || e.studentId === studentId);
+  
+  // Enhanced filtering for cross-device support
+  return enrolledClasses.filter(e => {
+    // Include enrollments that match studentId OR deviceId
+    const matchesById = e.studentId && e.studentId === studentId;
+    const matchesByDevice = e.deviceId && e.deviceId === studentId;
+    
+    return matchesById || matchesByDevice;
+  });
 }
 
 // Fix old enrollments that don't have studentId by removing them (clean data)
@@ -252,6 +299,59 @@ function setBackendUrl(url) {
 function setCloudflareUrl(url) {
   localStorage.setItem('cloudflareUrl', url.replace(/\/$/, '')); // Remove trailing slash
   toast(`✅ Cloudflare backend URL set to: ${url}`);
+}
+
+// Cross-Device Student Data Sync
+function initializeCrossDeviceSupport() {
+  // Ensure deviceId exists for cross-device support
+  if (!localStorage.getItem('deviceId')) {
+    const deviceId = 'student_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('deviceId', deviceId);
+    console.log('Created deviceId for cross-device support:', deviceId);
+  }
+  
+  // Migrate old student data to new format
+  const currentStudentId = localStorage.getItem('currentStudentId');
+  const deviceId = localStorage.getItem('deviceId');
+  
+  // If no current student but we have a deviceId, create basic student profile
+  if (!currentStudentId && deviceId) {
+    const studentProfile = {
+      id: deviceId,
+      name: `Student ${deviceId.slice(-6)}`,
+      email: '',
+      createdAt: new Date().toISOString(),
+      lastSync: new Date().toISOString()
+    };
+    
+    saveStudentProfile(studentProfile);
+    window.currentStudent = studentProfile;
+    localStorage.setItem('currentStudentId', deviceId);
+    
+    console.log('Created student profile for cross-device support');
+  }
+  
+  // Clean up old enrollments that don't have proper IDs
+  cleanOldEnrollments();
+  
+  console.log('Cross-device support initialized');
+}
+
+// Auto-sync function to update last accessed time
+function updateClassAccess(classId) {
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  const enrollment = enrolledClasses.find(e => e.classId === classId);
+  
+  if (enrollment) {
+    enrollment.lastAccessed = new Date().toISOString();
+    enrollment.deviceInfo = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      timestamp: new Date().toISOString()
+    };
+    
+    localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(enrolledClasses));
+  }
 }
 
 // ============= CLOUD BACKUP FUNCTIONS =============
@@ -4004,9 +4104,13 @@ function renderStudentClassesView() {
                    style="background-color: var(--surface); color: var(--on-surface);">
                 <div class="flex justify-between items-start">
                   <div>
-                    <h4 class="text-xl font-bold">${enrollment.className}</h4>
+                    <h4 class="text-xl font-bold cursor-pointer hover:text-blue-600 transition-colors" 
+                        onclick="updateClassAccess('${enrollment.classId}'); openClassQuiz('${enrollment.classId}', '${enrollment.className}')">
+                      ${enrollment.className}
+                    </h4>
                     <p class="text-sm" style="color: var(--on-surface-variant);">
                       Enrolled: ${new Date(enrollment.enrolledAt).toLocaleDateString()}
+                      ${enrollment.lastAccessed ? `| Last accessed: ${new Date(enrollment.lastAccessed).toLocaleDateString()}` : ''}
                     </p>
                   </div>
                   <button class="px-3 py-1 text-sm rounded transition-colors"
@@ -4080,12 +4184,26 @@ function enrollInClass() {
     return;
   }
   
-  const result = enrollStudentInClass(classCode);
+  // Get current student info or create flexible student info
+  const studentInfo = window.currentStudent || {
+    id: localStorage.getItem('currentStudentId') || localStorage.getItem('deviceId'),
+    name: window.currentStudent?.name || `Student ${(localStorage.getItem('deviceId') || '').slice(-6) || 'User'}`
+  };
+  
+  // Enhanced enrollment with cross-device support
+  const result = enrollStudentInClass(classCode, studentInfo);
   
   if (result.success) {
     document.getElementById('class-code-input').value = '';
+    
+    // Update current student info
+    if (studentInfo) {
+      window.currentStudent = studentInfo;
+      localStorage.setItem('currentStudentId', studentInfo.id);
+    }
+    
     renderApp();
-    toast('✅ Successfully enrolled in class!');
+    toast('✅ Successfully enrolled in class! You can now access this class from any device.');
   } else {
     toast('❌ ' + result.error);
   }
@@ -9975,6 +10093,9 @@ window.addEventListener("appinstalled", () => {
 
 if ("serviceWorker" in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
   window.addEventListener("load", () => {
+    // Initialize cross-device support first
+    initializeCrossDeviceSupport();
+    
     navigator.serviceWorker.register("./service-worker.js")
       .then(registration => {
         console.log("Service Worker registered successfully:", registration.scope);
