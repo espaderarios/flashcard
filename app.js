@@ -1438,6 +1438,7 @@ let teacherQuizIndex = 0;
 let teacherQuizScore = 0;
 let isTeacherQuiz = false;
 let currentQuizId = null;
+let teacherQuizzes = [];
 let isStudentLocked = false;
 let studentTab = "main";   
 let teacherTab = "main";
@@ -3707,6 +3708,10 @@ function openQuizSettingsModal(classId) {
   document.body.appendChild(overlay);
 }
 
+// ============= FIX FOR TEACHER SCORE DISPLAY =============
+
+// 1. Replace your renderStudentScoresView function with this fixed version:
+
 function renderStudentScoresView(classId) {
   // Clean up old enrollments without studentId
   cleanOldEnrollments();
@@ -3714,10 +3719,18 @@ function renderStudentScoresView(classId) {
   const enrollments = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]")
     .filter(e => e.classId === classId);
   const classQuizzes = getClassQuizzes(classId);
-  const scoresData = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
   
-  // Convert scores object to array for easier manipulation
-  const allScores = Object.values(scoresData);
+  // FIX: Get scores as an ARRAY, not object
+  let allScores = JSON.parse(localStorage.getItem('studentQuizScores') || '[]');
+  
+  // If it's stored as an object, convert to array
+  if (!Array.isArray(allScores)) {
+    allScores = Object.values(allScores);
+  }
+  
+  console.log('DEBUG: All scores:', allScores); // Debug log
+  console.log('DEBUG: Enrollments:', enrollments); // Debug log
+  console.log('DEBUG: Class quizzes:', classQuizzes); // Debug log
   
   if (enrollments.length === 0) {
     return `<div class="p-6 text-center" style="background: var(--surface); color: var(--on-surface-variant); border-radius: 8px;">
@@ -3729,7 +3742,9 @@ function renderStudentScoresView(classId) {
   
   enrollments.forEach(enrollment => {
     html += `<div style="margin-bottom: 30px; padding: 15px; background: var(--input-bg); border-radius: 8px;">`;
-    html += `<h4 style="font-weight: bold; margin-bottom: 12px; color: var(--on-surface);">Student: ${enrollment.studentId}</h4>`;
+    html += `<h4 style="font-weight: bold; margin-bottom: 12px; color: var(--on-surface);">
+      Student: ${enrollment.studentId || 'Unknown'}
+    </h4>`;
     html += '<table style="width: 100%; border-collapse: collapse;">';
     html += '<thead>';
     html += '<tr style="background: var(--surface); border-bottom: 2px solid var(--border);">';
@@ -3742,13 +3757,17 @@ function renderStudentScoresView(classId) {
     html += '</thead>';
     html += '<tbody>';
     
-    // Get all scores for this student across all quizzes in this class
-    const studentScores = allScores.filter(s => s && s.studentId === enrollment.studentId);
+    // FIX: Filter scores properly
+    const studentScores = allScores.filter(s => {
+      return s && s.studentId === enrollment.studentId;
+    });
+    
+    console.log(`DEBUG: Scores for student ${enrollment.studentId}:`, studentScores);
     
     if (studentScores.length === 0) {
       html += '<tr><td colspan="5" style="padding: 12px; text-align: center; color: var(--on-surface-variant);">No quiz attempts yet</td></tr>';
     } else {
-      // Group scores by quiz and show all attempts
+      // Group scores by quiz
       const scoresByQuiz = {};
       studentScores.forEach(score => {
         if (!scoresByQuiz[score.quizId]) {
@@ -3765,12 +3784,13 @@ function renderStudentScoresView(classId) {
           html += '<td colspan="4" style="padding: 12px; text-align: center; color: var(--on-surface-variant);">Not attempted</td></tr>';
         } else {
           // Sort by date (oldest first)
-          quizAttempts.sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+          quizAttempts.sort((a, b) => new Date(a.completedAt || 0) - new Date(b.completedAt || 0));
           
           quizAttempts.forEach((attempt, idx) => {
-            const grade = getLetterGrade(attempt.percentage || 0);
+            const percentage = attempt.percentage || Math.round((attempt.score / attempt.total) * 100);
+            const grade = getLetterGrade(percentage);
             const gradeColor = getGradeColor(grade);
-            const date = new Date(attempt.completedAt);
+            const date = new Date(attempt.completedAt || Date.now());
             const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             html += `<tr style="border-bottom: 1px solid var(--border);">`;
@@ -3780,10 +3800,10 @@ function renderStudentScoresView(classId) {
               html += `<td style="padding: 12px; color: var(--on-surface);"></td>`;
             }
             html += `<td style="padding: 12px; text-align: center; color: var(--on-surface);">${idx + 1}</td>`;
-            html += `<td style="padding: 12px; text-align: center; color: var(--on-surface);">${attempt.score}/${attempt.total}</td>`;
+            html += `<td style="padding: 12px; text-align: center; color: var(--on-surface);">${attempt.score || 0}/${attempt.total || 0}</td>`;
             html += `<td style="padding: 12px; text-align: center;">
               <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: ${gradeColor}; color: white; font-weight: bold;">
-                ${grade} (${attempt.percentage}%)
+                ${grade} (${percentage}%)
               </span>
             </td>`;
             html += `<td style="padding: 12px; text-align: center; font-size: 12px; color: var(--on-surface-variant);">${dateStr}</td>`;
@@ -3801,6 +3821,93 @@ function renderStudentScoresView(classId) {
   html += '</div>';
   
   return html;
+}
+
+// 2. Make sure these helper functions exist:
+
+function getLetterGrade(percentage) {
+  if (percentage >= 90) return 'A';
+  if (percentage >= 80) return 'B';
+  if (percentage >= 70) return 'C';
+  if (percentage >= 60) return 'D';
+  return 'F';
+}
+
+function getGradeColor(grade) {
+  switch(grade) {
+    case 'A': return '#22c55e'; // green
+    case 'B': return '#3b82f6'; // blue
+    case 'C': return '#f59e0b'; // orange
+    case 'D': return '#ef4444'; // red
+    case 'F': return '#7f1d1d'; // dark red
+    default: return 'var(--primary)';
+  }
+}
+
+// 3. CRITICAL: When a student submits a quiz, make sure it saves like this:
+
+function saveStudentQuizScore(quizId, score, totalQuestions) {
+  const student = window.currentStudent;
+  
+  if (!student || !student.id) {
+    console.error('No student info found!');
+    return false;
+  }
+  
+  // Get existing scores
+  let scores = JSON.parse(localStorage.getItem('studentQuizScores') || '[]');
+  
+  // Ensure it's an array
+  if (!Array.isArray(scores)) {
+    scores = [];
+  }
+  
+  // Create score entry
+  const scoreEntry = {
+    studentId: student.id,
+    studentName: student.name,
+    quizId: quizId,
+    score: score,
+    total: totalQuestions,
+    percentage: Math.round((score / totalQuestions) * 100),
+    completedAt: new Date().toISOString()
+  };
+  
+  // Add to scores array
+  scores.push(scoreEntry);
+  
+  // Save back to localStorage
+  localStorage.setItem('studentQuizScores', JSON.stringify(scores));
+  
+  console.log('Score saved:', scoreEntry);
+  console.log('All scores now:', scores);
+  
+  return true;
+}
+
+// 4. Debug function - Add this to check what's stored:
+
+function debugScores() {
+  console.log('=== SCORE DEBUG ===');
+  
+  const raw = localStorage.getItem('studentQuizScores');
+  console.log('Raw data:', raw);
+  
+  if (!raw) {
+    console.log('No scores found in localStorage');
+    return;
+  }
+  
+  try {
+    const parsed = JSON.parse(raw);
+    console.log('Parsed scores:', parsed);
+    console.log('Is array?', Array.isArray(parsed));
+    console.log('Length:', Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length);
+  } catch (e) {
+    console.error('Error parsing scores:', e);
+  }
+  
+  console.log('=== END DEBUG ===');
 }
 
 function openStudentScoresModal(classId) {
@@ -5432,6 +5539,8 @@ function finishStudentQuiz() {
     date: Date.now()
   });
 
+  saveQuizScoreNow(); 
+
   // Submit to Cloudflare
   (async () => {
     try {
@@ -5463,6 +5572,60 @@ function finishStudentQuiz() {
   populateStudentScores();
 }
 
+// ============= SAVE QUIZ SCORE TO LOCALSTORAGE =============
+function saveQuizScoreNow() {
+  // Get current student data
+  const student = window.currentStudent || JSON.parse(localStorage.getItem("currentStudent") || "{}");
+  
+  if (!student || !student.id || !student.name) {
+    console.warn("⚠️ Cannot save quiz score: Student not logged in");
+    toast("⚠️ Student info missing - score not saved");
+    return false;
+  }
+
+  // Determine which quiz we're saving
+  const quizId = currentQuizId || window._classQuizId;
+  
+  if (!quizId) {
+    console.warn("⚠️ Cannot save quiz score: No quiz ID found");
+    return false;
+  }
+
+  // Calculate percentage
+  const percentage = Math.round((quizScore / quizQuestions.length) * 100);
+  const letterGrade = getLetterGrade(percentage);
+
+  // Get existing scores
+  const allScores = JSON.parse(localStorage.getItem("studentQuizScores") || "[]");
+
+  // Create new score record
+  const scoreRecord = {
+    id: crypto.randomUUID ? crypto.randomUUID() : `score_${Date.now()}_${Math.random()}`,
+    studentId: student.id,
+    studentName: student.name,
+    quizId: quizId,
+    score: quizScore,
+    total: quizQuestions.length,
+    percentage: percentage,
+    letterGrade: letterGrade,
+    completedAt: new Date().toISOString(),
+    attemptNumber: allScores.filter(s => s.quizId === quizId && s.studentId === student.id).length + 1
+  };
+
+  // Add to scores array
+  allScores.push(scoreRecord);
+
+  // Save to localStorage
+  try {
+    localStorage.setItem("studentQuizScores", JSON.stringify(allScores));
+    console.log("✅ Quiz score saved:", scoreRecord);
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to save quiz score:", error);
+    toast("❌ Error saving score to local storage");
+    return false;
+  }
+}
 
 
 
@@ -5564,6 +5727,7 @@ function nextTeacherQuiz() {
     selectedAnswer = null;
     renderApp();
   } else {
+    saveQuizScoreNow();
     finishStudentQuiz();
   }
 }
@@ -5917,6 +6081,11 @@ function renderStudentScoreHistoryView() {
 
 
 function renderTeacherQuizResultView() {
+      if (!window._scoreAlreadySaved) {
+    saveQuizScoreNow();
+    window._scoreAlreadySaved = true;
+  }
+  
   if (!teacherQuizData || !teacherQuizData.questions) {
     console.warn("Teacher quiz result rendered without data");
     currentView = "home";
@@ -7457,33 +7626,38 @@ function finishClassQuiz() {
   const questions = quiz.questions || [];
   
   questions.forEach((q, idx) => {
-    // Handle both property names for correct answer
     const correctAnswer = q.correctAnswer || q.correct;
     const userAnswer = state.answers[idx];
     
-    // Convert user answer to letter format if it's full text
     let userAnswerLetter = userAnswer;
     if (userAnswer && userAnswer.length > 1) {
-      // User answer is full option text, convert to letter
       const answerIndex = (q.options || []).indexOf(userAnswer);
       userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
     }
     
-    // Normalize correct answer to letter format
     let correctAnswerLetter = correctAnswer;
     if (correctAnswer && correctAnswer.length > 1) {
-      // Correct answer is full option text, convert to letter
       const correctIndex = (q.options || []).indexOf(correctAnswer);
       correctAnswerLetter = correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : correctAnswer;
     }
     
-    // Compare the letter versions
     if (userAnswerLetter === correctAnswerLetter) {
       correctCount++;
     }
   });
   
+  // ✅ UPDATE global quizScore before saving
+  quizScore = correctCount;
+  quizQuestions = questions;
+  
   state.score = correctCount;
+  
+  // ✅ Now save with correct values
+  const saved = saveQuizScoreNow();
+  
+  if (!saved) {
+    console.warn("⚠️ Failed to save class quiz score");
+  }
   
   // Save score to localStorage
   const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');

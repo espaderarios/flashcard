@@ -4606,20 +4606,122 @@ function finishStudentQuiz() {
     return;
   }
 
-  saveStudentScore({
-    studentName: window.currentStudent.name,
-    studentId: window.currentStudent.id,
-    quizId: currentQuizId,
-    score: quizScore,
-    total: quizQuestions.length,
-    date: Date.now()
-  });
+  // ✅ SAVE BEFORE submitting to cloud (score is already calculated)
+  const saved = saveQuizScoreNow();
+  
+  if (!saved) {
+    console.warn("⚠️ Failed to save quiz score locally");
+  }
+
+  // Submit to Cloudflare
+  (async () => {
+    try {
+      const answers = {};
+      for (const [key, value] of Object.entries(window.quizAnswers || {})) {
+        const questionIndex = parseInt(key.replace('q', ''));
+        if (!isNaN(questionIndex)) {
+          answers[questionIndex] = value;
+        }
+      }
+
+      const result = await submitQuizToCloudflare(currentQuizId, answers);
+      if (result && !result.error) {
+        console.log("✅ Quiz submission synced to cloud:", result);
+      } else {
+        console.warn("⚠️ Failed to sync quiz to cloud:", result?.error || "Unknown error");
+      }
+    } catch (error) {
+      console.warn("⚠️ Could not sync quiz results to cloud:", error.message);
+    }
+  })();
 
   currentView = "student-score-history";
   renderApp();
   populateStudentScores();
 }
 
+// ============= SAVE QUIZ SCORE TO LOCALSTORAGE =============
+// ============= SAVE QUIZ SCORE TO LOCALSTORAGE =============
+function saveQuizScoreNow() {
+  // Get current student data
+  const student = window.currentStudent || JSON.parse(localStorage.getItem("currentStudent") || "{}");
+  
+  if (!student || !student.id || !student.name) {
+    console.warn("⚠️ Cannot save quiz score: Student not logged in");
+    return false;
+  }
+
+  // Determine which quiz we're saving
+  const quizId = currentQuizId || window._classQuizId;
+  
+  if (!quizId) {
+    console.warn("⚠️ Cannot save quiz score: No quiz ID found");
+    return false;
+  }
+
+  // ✅ DEBUG: Log values before saving
+  console.log("📊 Saving Quiz Score:", {
+    studentId: student.id,
+    studentName: student.name,
+    quizId: quizId,
+    quizScore: quizScore,
+    quizQuestionsLength: quizQuestions.length
+  });
+
+  // Safety check - ensure we have valid numbers
+  if (typeof quizScore !== 'number' || quizScore < 0) {
+    console.error("❌ Invalid quizScore:", quizScore);
+    return false;
+  }
+
+  if (typeof quizQuestions !== 'object' || !Array.isArray(quizQuestions) || quizQuestions.length === 0) {
+    console.error("❌ Invalid quizQuestions:", quizQuestions);
+    return false;
+  }
+
+  // Calculate percentage
+  const totalQuestions = quizQuestions.length;
+  const percentage = Math.round((quizScore / totalQuestions) * 100);
+  const letterGrade = getLetterGrade(percentage);
+
+  // Validate percentage
+  if (isNaN(percentage)) {
+    console.error("❌ Percentage is NaN:", { quizScore, totalQuestions });
+    return false;
+  }
+
+  // Get existing scores
+  const allScores = JSON.parse(localStorage.getItem("studentQuizScores") || "[]");
+
+  // Create new score record
+  const scoreRecord = {
+    id: crypto.randomUUID ? crypto.randomUUID() : `score_${Date.now()}_${Math.random()}`,
+    studentId: student.id,
+    studentName: student.name,
+    quizId: quizId,
+    score: quizScore,
+    total: totalQuestions,
+    percentage: percentage,
+    letterGrade: letterGrade,
+    completedAt: new Date().toISOString(),
+    attemptNumber: allScores.filter(s => s.quizId === quizId && s.studentId === student.id).length + 1
+  };
+
+  // Add to scores array
+  allScores.push(scoreRecord);
+
+  // Save to localStorage
+  try {
+    localStorage.setItem("studentQuizScores", JSON.stringify(allScores));
+    console.log("✅ Quiz score saved successfully:", scoreRecord);
+    toast("✅ Score saved: " + quizScore + "/" + totalQuestions + " (" + percentage + "%)");
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to save quiz score:", error);
+    toast("❌ Error saving score to local storage");
+    return false;
+  }
+}
 
 
 
@@ -4696,7 +4798,8 @@ function nextTeacherQuiz() {
     selectedAnswer = null;
     renderApp();
   } else {
-    finishStudentQuiz();
+    currentView = "teacher-quiz-result";
+    renderApp();
   }
 }
 
@@ -5049,6 +5152,11 @@ function renderStudentScoreHistoryView() {
 
 
 function renderTeacherQuizResultView() {
+    if (!window._scoreAlreadySaved) {
+    saveQuizScoreNow();
+    window._scoreAlreadySaved = true;
+  }
+
   if (!teacherQuizData || !teacherQuizData.questions) {
     console.warn("Teacher quiz result rendered without data");
     currentView = "home";
@@ -6560,33 +6668,38 @@ function finishClassQuiz() {
   const questions = quiz.questions || [];
   
   questions.forEach((q, idx) => {
-    // Handle both property names for correct answer
     const correctAnswer = q.correctAnswer || q.correct;
     const userAnswer = state.answers[idx];
     
-    // Convert user answer to letter format if it's full text
     let userAnswerLetter = userAnswer;
     if (userAnswer && userAnswer.length > 1) {
-      // User answer is full option text, convert to letter
       const answerIndex = (q.options || []).indexOf(userAnswer);
       userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
     }
     
-    // Normalize correct answer to letter format
     let correctAnswerLetter = correctAnswer;
     if (correctAnswer && correctAnswer.length > 1) {
-      // Correct answer is full option text, convert to letter
       const correctIndex = (q.options || []).indexOf(correctAnswer);
       correctAnswerLetter = correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : correctAnswer;
     }
     
-    // Compare the letter versions
     if (userAnswerLetter === correctAnswerLetter) {
       correctCount++;
     }
   });
   
+  // ✅ UPDATE global quizScore before saving
+  quizScore = correctCount;
+  quizQuestions = questions;
+  
   state.score = correctCount;
+  
+  // ✅ Now save with correct values
+  const saved = saveQuizScoreNow();
+  
+  if (!saved) {
+    console.warn("⚠️ Failed to save class quiz score");
+  }
   
   // Save score to localStorage
   const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
