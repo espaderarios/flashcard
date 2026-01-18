@@ -2108,12 +2108,10 @@ function startBrowseStudy(setId) {
   renderApp();
 }
 
+// ---------- Render Browse Study as Flashcards ----------
 function renderBrowseStudyView() {
   const card = currentBrowseSetCards[currentBrowseCardIndex];
-  if (!card) {
-    currentView = "browse-cards";
-    return renderBrowseCardsView();
-  }
+  if (!card) return renderBrowseCardsView();
 
   const totalCards = currentBrowseSetCards.length;
   const progress = ((currentBrowseCardIndex + 1) / totalCards) * 100;
@@ -2122,86 +2120,46 @@ function renderBrowseStudyView() {
   const answerMathML = card.answer?.mathml || '';
 
   return `
-    <div class="p-6 max-w-lg mx-auto fade-in">
+    <div class="p-6 max-w-lg mx-auto fade-in" style="color: var(--text);">
 
-      <!-- Back button & progress -->
+      <!-- Back & progress -->
       <div class="mb-6">
-        <button class="btn-secondary mb-4" onclick="backToBrowseCards()">
-          ← Back to Cards
-        </button>
-
-        <div class="progress-bar mb-4">
-          <div style="width: ${progress}%"></div>
+        <button class="btn-secondary mb-4" onclick="backToBrowseCards()">← Back to Cards</button>
+        <div class="progress-bar mb-4" style="background: var(--surface);">
+          <div style="width: ${progress}%; background: var(--primary); height: 4px;"></div>
         </div>
-
         <div class="text-center text-sm text-text-muted mb-4">
           Card ${currentBrowseCardIndex + 1} of ${totalCards}
         </div>
       </div>
 
       <!-- Flashcard -->
-      <div class="card-study p-0 rounded-xl text-center mb-2"
-           style="background: var(--card-bg); perspective: 1000px; box-shadow: var(--shadow-lg);">
+<div class="card-study rounded-xl mb-2" style="background: var(--card-bg); box-shadow: var(--shadow); perspective: 1000px;">
+  <div class="card-inner ${isBrowseCardFlipped ? 'flipped' : ''}"
+       onclick="flipBrowseCard()"
+       style="transform-style: preserve-3d; cursor: pointer; width: 100%; min-height: 260px; border-radius: var(--radius); transition: transform 0.6s cubic-bezier(.175,.885,.32,1.275), scale 0.3s ease;">
 
-        <div class="card-inner ${isBrowseCardFlipped ? 'flipped' : ''}"
-             onclick="flipBrowseCard()"
-             style="
-               transition: transform 0.6s cubic-bezier(.175,.885,.32,1.275), scale 0.3s ease;
-               transform-style: preserve-3d;
-               cursor: pointer;
-               position: relative;
-               width: 100%;
-               min-height: 260px;
-               border-radius: var(--radius);
-             ">
+    <!-- FRONT -->
+    <div class="card-front absolute inset-0 rounded-xl flex flex-col items-center justify-center p-4"
+         style="backface-visibility: hidden; background: var(--card-bg);">
+      ${card.questionImage ? `<img src="${card.questionImage}" style="max-width: 100%; max-height: 60%; object-fit: contain; border-radius: var(--radius);" alt="Question image">` : ""}
+      <div class="text-center text-lg font-semibold mt-2" style="color: var(--text);">${!isBrowseCardFlipped ? card.question : ''}</div>
+    </div>
 
-          <!-- FRONT -->
-          <div class="card-front absolute inset-0 rounded-xl overflow-hidden flex flex-col items-center justify-center"
-               style="backface-visibility: hidden; padding: 1rem;">
-            ${card.questionImage
-              ? `<img src="${card.questionImage}"
-                     class="object-contain mb-2"
-                     style="max-width: 100%; max-height: 60%; border-radius: var(--radius);"
-                     alt="Question image">`
-              : ""
-            }
-            <div class="text-center text-lg font-semibold">
-              ${!isBrowseCardFlipped ? card.question : ''}
-            </div>
-          </div>
+    <!-- BACK -->
+    <div class="card-back absolute inset-0 rounded-xl flex flex-col items-center justify-center p-4"
+         style="backface-visibility: hidden; transform: rotateY(180deg); background: var(--card-bg);">
+      ${card.answerImage ? `<img src="${card.answerImage}" style="max-width: 100%; max-height: 60%; object-fit: contain; border-radius: var(--radius);" alt="Answer image">` : ""}
+      <div class="text-center text-lg font-semibold mt-2" style="color: var(--text);">${isBrowseCardFlipped ? answerText : ''}</div>
+      ${isBrowseCardFlipped && answerMathML ? `<div id="answerMath" class="text-lg leading-relaxed mt-2" style="color: var(--text);">${answerMathML}</div>` : ""}
+    </div>
 
-          <!-- BACK -->
-          <div class="card-back absolute inset-0 rounded-xl overflow-hidden flex flex-col items-center justify-center"
-               style="backface-visibility: hidden; transform: rotateY(180deg); padding: 1rem;">
-            ${card.answerImage
-              ? `<img src="${card.answerImage}"
-                     class="object-contain mb-2"
-                     style="max-width: 100%; max-height: 60%; border-radius: var(--radius);"
-                     alt="Answer image">`
-              : ""
-            }
-<div class="text-center text-lg font-semibold">
-  ${isBrowseCardFlipped ? answerText : ''}
+  </div>
 </div>
 
-            ${isBrowseCardFlipped && answerMathML
-              ? `<div id="answerMath" class="text-lg leading-relaxed mt-2">
-                   ${answerMathML}
-                 </div>`
-              : ""
-            }
-          </div>
 
-        </div>
-      </div>
-
-      <!-- Image credits below the flashcard -->
-      ${card.imageCredit
-        ? `<div class="text-right text-text-muted mb-4" style="font-size: 10px;">
-             Image credit: ${card.imageCredit}
-           </div>`
-        : ''
-      }
+      <!-- Image credits below -->
+      ${card.imageCredit ? `<div class="text-right text-text-muted mb-4" style="font-size: 10px;">Image credit: ${card.imageCredit}</div>` : ''}
 
       <!-- Tap hint -->
       <div class="text-center mb-4">
@@ -2212,39 +2170,22 @@ function renderBrowseStudyView() {
       <div class="flex justify-between gap-4">
         <button onclick="prevBrowseCard()"
                 class="btn-secondary flex-1 py-3 ${currentBrowseCardIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
-                ${currentBrowseCardIndex === 0 ? 'disabled' : ''}>
-          ← Previous
-        </button>
+                ${currentBrowseCardIndex === 0 ? 'disabled' : ''}>← Previous</button>
         <button onclick="nextBrowseCard()"
                 class="btn-secondary flex-1 py-3 ${currentBrowseCardIndex === totalCards - 1 ? 'opacity-50 cursor-not-allowed' : ''}"
-                ${currentBrowseCardIndex === totalCards - 1 ? 'disabled' : ''}>
-          Next →
-        </button>
+                ${currentBrowseCardIndex === totalCards - 1 ? 'disabled' : ''}>Next →</button>
       </div>
 
       <style>
-        .card-inner {
-          transform: rotateY(0deg);
-        }
-
-        .card-inner.flipped {
-          transform: rotateY(180deg) scale(1.02);
-          box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-        }
-
-        .card-back {
-          opacity: 0;
-          transition: opacity 0.3s ease 0.25s;
-        }
-
-        .card-inner.flipped .card-back {
-          opacity: 1;
-        }
+        .card-inner { transform: rotateY(0deg); }
+        .card-inner.flipped { transform: rotateY(180deg) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+        .card-back { opacity: 0; transition: opacity 0.3s ease 0.25s; }
+        .card-inner.flipped .card-back { opacity: 1; }
       </style>
-
     </div>
   `;
 }
+
 
 // ---------- Flip Card ----------
 function flipBrowseCard() {
