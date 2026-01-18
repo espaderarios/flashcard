@@ -999,23 +999,38 @@ const BUILT_IN_SETS = {
         answer: {
           mathml: `
 <math xmlns="http://www.w3.org/1998/Math/MathML">
-  <msub><mi>i</mi><mn>1</mn></msub>
+  <msub>
+    <mi>i</mi>
+    <mn>1</mn>
+  </msub>
   <mo>=</mo>
   <mn>9</mn>
   <mtext>&#xA0;</mtext>
-  <mi>A</mi>
-  <mspace width="1em"/>
-  <msub><mi>i</mi><mn>2</mn></msub>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mspace width="1em" />
+  <msub>
+    <mi>i</mi>
+    <mn>2</mn>
+  </msub>
   <mo>=</mo>
   <mn>2.5</mn>
   <mtext>&#xA0;</mtext>
-  <mi>A</mi>
-  <mspace width="1em"/>
-  <msub><mi>i</mi><mn>3</mn></msub>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mspace width="1em" />
+  <msub>
+    <mi>i</mi>
+    <mn>3</mn>
+  </msub>
   <mo>=</mo>
   <mn>2</mn>
   <mtext>&#xA0;</mtext>
-  <mi>A</mi>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
 </math>
 `,
         },
@@ -1028,25 +1043,40 @@ const BUILT_IN_SETS = {
         answer: {
           mathml: `
 <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
-  <msub><mi>I</mi><mn>1</mn></msub>
+  <msub>
+    <mi>I</mi>
+    <mn>1</mn>
+  </msub>
   <mo>=</mo>
-  <mo>&#x2212;</mo>
+  <mo>&#x2212;<!-- − --></mo>
   <mn>3</mn>
   <mtext>&#xA0;</mtext>
-  <mi>A</mi>
-  <mspace width="1em"/>
-  <msub><mi>I</mi><mn>2</mn></msub>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mspace width="1em" />
+  <msub>
+    <mi>I</mi>
+    <mn>2</mn>
+  </msub>
   <mo>=</mo>
-  <mo>&#x2212;</mo>
+  <mo>&#x2212;<!-- − --></mo>
   <mn>2</mn>
   <mtext>&#xA0;</mtext>
-  <mi>A</mi>
-  <mspace width="1em"/>
-  <msub><mi>I</mi><mn>3</mn></msub>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mspace width="1em" />
+  <msub>
+    <mi>I</mi>
+    <mn>3</mn>
+  </msub>
   <mo>=</mo>
   <mn>0</mn>
   <mtext>&#xA0;</mtext>
-  <mi>A</mi>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
 </math>
 `,
         },
@@ -1059,24 +1089,312 @@ const BUILT_IN_SETS = {
         answer: {
           mathml: `
 <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
-  <mtable columnalign="right left right left right left" rowspacing="3pt" columnspacing="0em 2em 0em 2em 0em 2em" displaystyle="true">
+  <mtable columnalign="right left right left right left right left right left right left" rowspacing="3pt" columnspacing="0em 2em 0em 2em 0em 2em 0em 2em 0em 2em 0em" displaystyle="true">
     <mtr>
-      <mtd><msub><mi>I</mi><mn>1</mn></msub></mtd>
-      <mtd>= 7.403 <mi>A</mi></mtd>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>1</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>7.403</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
     </mtr>
     <mtr>
-      <mtd><msub><mi>I</mi><mn>2</mn></msub></mtd>
-      <mtd>= 1.26 <mi>A</mi></mtd>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>2</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>1.26</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
     </mtr>
     <mtr>
-      <mtd><msub><mi>I</mi><mn>3</mn></msub></mtd>
-      <mtd>= 5.97 <mi>A</mi></mtd>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>3</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>5.97</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
     </mtr>
   </mtable>
 </math>
 `,
         },
         answerImage: "CircuitsImg/CircuitsA3.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+            {
+        question: "Find the voltage across each resistor in this circuit:",
+        questionImage: "CircuitsImg/CircuitsQ4.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mtable columnalign="right left right left right left right left right left right left" rowspacing="3pt" columnspacing="0em 2em 0em 2em 0em 2em 0em 2em 0em 2em 0em" displaystyle="true">
+    <mtr>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>1</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>3.33</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
+    </mtr>
+    <mtr>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>2</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>0.3298</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
+    </mtr>
+    <mtr>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>3</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>1.508</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
+    </mtr>
+    <mtr>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>4</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>2.497</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
+    </mtr>
+  </mtable>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA4.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+            {
+        question: "Find the voltage across each resistor in this circuit:",
+        questionImage: "CircuitsImg/CircuitsQ5.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <msub>
+    <mi>I</mi>
+    <mn>1</mn>
+  </msub>
+  <mo>=</mo>
+  <mo>&#x2212;<!-- − --></mo>
+  <mn>1.455</mn>
+  <mtext>&#xA0;</mtext>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mspace width="1em" />
+  <msub>
+    <mi>I</mi>
+    <mn>2</mn>
+  </msub>
+  <mo>=</mo>
+  <mn>0.5455</mn>
+  <mtext>&#xA0;</mtext>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA5.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+            {
+        question: "Find the voltage across each resistor in this circuit:",
+        questionImage: "CircuitsImg/CircuitsQ6.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mtable columnalign="right left right left right left right left right left right left" rowspacing="3pt" columnspacing="0em 2em 0em 2em 0em 2em 0em 2em 0em 2em 0em" displaystyle="true">
+    <mtr>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>1</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>4.92</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
+    </mtr>
+    <mtr>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>2</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>0.25</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
+    </mtr>
+    <mtr>
+      <mtd>
+        <msub>
+          <mi>I</mi>
+          <mn>3</mn>
+        </msub>
+      </mtd>
+      <mtd>
+        <mi></mi>
+        <mo>=</mo>
+        <mn>4.25</mn>
+        <mtext>&#xA0;</mtext>
+        <mrow class="MJX-TeXAtom-ORD">
+          <mi mathvariant="normal">A</mi>
+        </mrow>
+      </mtd>
+    </mtr>
+  </mtable>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA6.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+            {
+        question: "Find the voltage across each resistor in this circuit:",
+        questionImage: "CircuitsImg/CircuitsQ7.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <msub>
+    <mi>i</mi>
+    <mrow class="MJX-TeXAtom-ORD">
+      <mn>1</mn>
+    </mrow>
+  </msub>
+  <mo>=</mo>
+  <mo>&#x2212;<!-- − --></mo>
+  <mn>7.5</mn>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mtext>&#xA0;</mtext>
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mo>,</mo>
+  <mspace width="1em" />
+  <msub>
+    <mi>i</mi>
+    <mrow class="MJX-TeXAtom-ORD">
+      <mn>2</mn>
+    </mrow>
+  </msub>
+  <mo>=</mo>
+  <mo>&#x2212;<!-- − --></mo>
+  <mn>2.5</mn>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mtext>&#xA0;</mtext>
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mo>,</mo>
+  <mspace width="1em" />
+  <msub>
+    <mi>i</mi>
+    <mrow class="MJX-TeXAtom-ORD">
+      <mn>3</mn>
+    </mrow>
+  </msub>
+  <mo>=</mo>
+  <mn>3.93</mn>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mtext>&#xA0;</mtext>
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+  <mo>,</mo>
+  <mspace width="1em" />
+  <msub>
+    <mi>i</mi>
+    <mrow class="MJX-TeXAtom-ORD">
+      <mn>4</mn>
+    </mrow>
+  </msub>
+  <mo>=</mo>
+  <mn>2.143</mn>
+  <mrow class="MJX-TeXAtom-ORD">
+    <mtext>&#xA0;</mtext>
+    <mi mathvariant="normal">A</mi>
+  </mrow>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA7.jpeg",
         imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
       }
     ]
