@@ -2108,7 +2108,6 @@ function startBrowseStudy(setId) {
   renderApp();
 }
 
-// ---------- Render Browse Study as Flashcards ----------
 function renderBrowseStudyView() {
   const card = currentBrowseSetCards[currentBrowseCardIndex];
   if (!card) {
@@ -2118,6 +2117,9 @@ function renderBrowseStudyView() {
 
   const totalCards = currentBrowseSetCards.length;
   const progress = ((currentBrowseCardIndex + 1) / totalCards) * 100;
+
+  const answerText = card.answer?.text || card.answer || '';
+  const answerMathML = card.answer?.mathml || '';
 
   return `
     <div class="p-6 max-w-lg mx-auto fade-in">
@@ -2137,8 +2139,8 @@ function renderBrowseStudyView() {
         </div>
       </div>
 
-      <!-- Flashcard image -->
-      <div class="card-study p-0 rounded-xl text-center mb-4"
+      <!-- Flashcard -->
+      <div class="card-study p-0 rounded-xl text-center mb-2"
            style="background: var(--card-bg); perspective: 1000px; box-shadow: var(--shadow-lg);">
 
         <div class="card-inner ${isBrowseCardFlipped ? 'flipped' : ''}"
@@ -2154,48 +2156,51 @@ function renderBrowseStudyView() {
              ">
 
           <!-- FRONT -->
-          <div class="card-front absolute inset-0 rounded-xl overflow-hidden"
-               style="backface-visibility: hidden;">
-            <img src="${card.questionImage || ''}"
-                 class="w-full h-full object-contain"
-                 alt="Question image">
+          <div class="card-front absolute inset-0 rounded-xl overflow-hidden flex flex-col items-center justify-center"
+               style="backface-visibility: hidden; padding: 1rem;">
+            ${card.questionImage
+              ? `<img src="${card.questionImage}"
+                     class="object-contain mb-2"
+                     style="max-width: 100%; max-height: 60%; border-radius: var(--radius);"
+                     alt="Question image">`
+              : ""
+            }
+            <div class="text-center text-lg font-semibold">
+              ${!isBrowseCardFlipped ? card.question : ''}
+            </div>
           </div>
 
           <!-- BACK -->
-          <div class="card-back absolute inset-0 rounded-xl overflow-hidden"
-               style="backface-visibility: hidden; transform: rotateY(180deg);">
-            <img src="${card.answerImage || ''}"
-                 class="w-full h-full object-contain"
-                 alt="Answer image">
+          <div class="card-back absolute inset-0 rounded-xl overflow-hidden flex flex-col items-center justify-center"
+               style="backface-visibility: hidden; transform: rotateY(180deg); padding: 1rem;">
+            ${card.answerImage
+              ? `<img src="${card.answerImage}"
+                     class="object-contain mb-2"
+                     style="max-width: 100%; max-height: 60%; border-radius: var(--radius);"
+                     alt="Answer image">`
+              : ""
+            }
+            <div class="text-center text-lg font-semibold">
+              ${isBrowseCardFlipped ? answerText : ''}
+            </div>
+            ${isBrowseCardFlipped && answerMathML
+              ? `<div id="answerMath" class="text-lg leading-relaxed mt-2">
+                   ${answerMathML}
+                 </div>`
+              : ""
+            }
           </div>
 
         </div>
       </div>
 
-<!-- Question / Answer below the flashcard -->
-<div class="text-center mb-4 p-4 bg-white rounded-xl shadow">
-  <div class="text-lg font-semibold mb-2">
-    ${isBrowseCardFlipped ? 'Answer' : 'Question'}
-  </div>
-  <p class="text-text leading-relaxed mb-2">
-    ${isBrowseCardFlipped ? card.answer?.text || '' : card.question}
-  </p>
-
-  <!-- MathML only if flipped -->
-  ${isBrowseCardFlipped ? `
-    <div id="answerMath" class="text-lg leading-relaxed">
-      ${card.answer?.mathml || ''}
-    </div>
-  ` : ''}
-
-  <!-- Image credits -->
-${card.imageCredit ? `
-  <div class="mt-1 text-right text-text-muted" style="font-size: 10px;">
-    Image credit: ${card.imageCredit}
-  </div>
-` : ''}
-</div>
-
+      <!-- Image credits below the flashcard -->
+      ${card.imageCredit
+        ? `<div class="text-right text-text-muted mb-4" style="font-size: 10px;">
+             Image credit: ${card.imageCredit}
+           </div>`
+        : ''
+      }
 
       <!-- Tap hint -->
       <div class="text-center mb-4">
@@ -2239,7 +2244,6 @@ ${card.imageCredit ? `
     </div>
   `;
 }
-
 
 // ---------- Flip Card ----------
 function flipBrowseCard() {
