@@ -301,22 +301,6 @@ if ('serviceWorker' in navigator) {
   <img src="icons/settings.svg" class="icon md" alt="settings" />
 </button>
 
-<script>
-  // Hide the settings button immediately after the page loads
-  document.addEventListener("DOMContentLoaded", () => {
-    const settingsBtn = document.getElementById("openSettingsBtn");
-    if (settingsBtn) {
-      settingsBtn.style.display = "none"; // hides the button
-    }
-  });
-
-  // Optional: function to toggle visibility later
-  function toggleSettingsButton() {
-    const btn = document.getElementById("openSettingsBtn");
-    if (!btn) return;
-    btn.style.display = btn.style.display === "none" ? "" : "none";
-  }
-</script>
 
 <script>
 if ('serviceWorker' in navigator) {
