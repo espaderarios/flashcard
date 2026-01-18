@@ -1982,6 +1982,36 @@ input[type="file"]::-webkit-file-upload-button:hover {
   padding: 20px;
   background: var(--background);
 }
+/* Fullscreen PDF mode */
+.pdf-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #000;
+  z-index: 9999;
+}
+
+.pdf-fullscreen #pdf-content {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.pdf-fullscreen canvas {
+  width: 100vw !important;
+  height: 100vh !important;
+  object-fit: contain;
+}
+
+body.pdf-lock {
+  overflow: hidden;
+}
+
 
 /* PDF Viewer Mobile Optimizations */
 @media (max-width: 767px) {

@@ -2751,9 +2751,10 @@ async function renderPage(num) {
   const effectiveScale = readingMode ? scale * 1.2 : scale;
 
   // Create viewport with scale and device pixel ratio for crisp rendering
-  const viewport = page.getViewport({
-    scale: effectiveScale * devicePixelRatio
-  });
+const viewport = page.getViewport({
+  scale: scale * (window.devicePixelRatio || 1)
+});
+
 
   // Set canvas size accounting for device pixel ratio
   const canvasContainer = canvas.parentElement;
@@ -2816,6 +2817,12 @@ async function renderPage(num) {
   hideLoadingIndicator();
 }
 
+window.addEventListener("resize", () => {
+  if (isFullscreen && pdfDoc) {
+    renderPage(pageNum);
+  }
+});
+
 
 function updateNavButtons() {
   document.getElementById("prev-page-btn").disabled = pageNum <= 1;
@@ -2864,38 +2871,40 @@ function toggleFullscreen() {
   if (!container) return;
 
   if (!document.fullscreenElement) {
-    // Enter fullscreen
-    container.requestFullscreen().catch(err => console.log(err));
+    container.requestFullscreen().catch(console.error);
   } else {
-    // Exit fullscreen
     document.exitFullscreen();
   }
 }
 
-// Listen for fullscreen changes
-document.addEventListener("fullscreenchange", () => {
-  const isFull = !!document.fullscreenElement;
-  const container = document.querySelector(".pdf-viewer-container");
-  const canvas = document.getElementById("pdf-canvas");
 
-  // Update global flag
+document.addEventListener("fullscreenchange", () => {
+  const container = document.querySelector(".pdf-viewer-container");
+  if (!container) return;
+
+  const isFull = !!document.fullscreenElement;
   isFullscreen = isFull;
 
-  // Show/hide UI
-  hidePdfUI(isFull);
+  const header = document.querySelector(".pdf-header");
+  const toolbar = document.getElementById("pdf-toolbar");
+  const footer = document.querySelector(".pdf-footer");
+  const settingsBtn = document.getElementById("openSettingsBtn");
 
-  if (canvas) {
-    if (isFull) {
-      canvas.style.width = "100vw";
-      canvas.style.height = "100vh";
-      canvas.style.objectFit = "contain";
-    } else {
-      canvas.style.objectFit = "initial";
-      // Re-render current page to reset canvas size
-      if (pdfDoc) renderPage(pageNum);
-    }
-  }
+  // Toggle UI
+  [header, toolbar, footer, settingsBtn].forEach(el => {
+    if (el) el.style.display = isFull ? "none" : "";
+  });
+
+  // Toggle fullscreen styles
+  container.classList.toggle("pdf-fullscreen", isFull);
+  document.body.classList.toggle("pdf-lock", isFull);
+
+  // Re-render to fit screen or restore
+  requestAnimationFrame(() => {
+    renderPage(pageNum);
+  });
 });
+
 
 
 function hidePdfUI(hide = true) {
