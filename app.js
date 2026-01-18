@@ -2118,7 +2118,7 @@ function renderBrowseStudyView() {
   const totalCards = currentBrowseSetCards.length;
   const progress = ((currentBrowseCardIndex + 1) / totalCards) * 100;
 
-  const answerText = card.answer?.text || card.answer || '';
+  const answerText = card.answer?.text || (typeof card.answer === 'string' ? card.answer : '');
   const answerMathML = card.answer?.mathml || '';
 
   return `
@@ -2180,9 +2180,10 @@ function renderBrowseStudyView() {
                      alt="Answer image">`
               : ""
             }
-            <div class="text-center text-lg font-semibold">
-              ${isBrowseCardFlipped ? answerText : ''}
-            </div>
+<div class="text-center text-lg font-semibold">
+  ${isBrowseCardFlipped ? answerText : ''}
+</div>
+
             ${isBrowseCardFlipped && answerMathML
               ? `<div id="answerMath" class="text-lg leading-relaxed mt-2">
                    ${answerMathML}
@@ -8777,4 +8778,3 @@ if ("serviceWorker" in navigator) {
 }
 
 
- 
