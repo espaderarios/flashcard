@@ -2196,55 +2196,19 @@ function goBackToBrowse() {
 
 function renderThemesView() {
   const categories = {
-  "Nature": [ 
-    "jungle", 
-    "safari", 
-    "ocean",
-    "lake"],
-  "Animals": [  
-  "animals_jungle",
-  "animals_safari",
-  "animals_ocean",
-  "animals_pets",
-  "animals_arctic",
-  "animals_rainforest",
-  "animals_desert",
-  "animals_farm",
-  "animals_jungle_night",
-  "animals_deep_sea",
-  "animals_butterflies",
-  "animals_tropical_birds"
-],
-  "K-pop": [
-  "blackpink", 
-  "bts", 
-  "twice",
-  "seventeen",
-  "straykids",
-  "exo",
-  "redvelvet",
-  "itzy",
-  "newjeans"
-],
-"Vibes": [
-    "forest", 
-    "mint", 
-    "lavender", 
-    "coffee",
-],
-    "Dark Aesthetic": [
-      "midnight", 
-      "graphite", 
-      "cyber",
-    "futuristic"],
-
-    "Light & Minimal": [
-      "light", 
-      "paper", 
-      "sunset", 
-      "rose"]
+    "Nature": ["jungle", "safari", "ocean", "lake"],
+    "Animals": [
+      "animals_jungle","animals_safari","animals_ocean","animals_pets","animals_arctic",
+      "animals_rainforest","animals_desert","animals_farm","animals_jungle_night",
+      "animals_deep_sea","animals_butterflies","animals_tropical_birds"
+    ],
+    "K-pop": ["blackpink", "bts", "twice","seventeen","straykids","exo","redvelvet","itzy","newjeans"],
+    "Vibes": ["forest","mint","lavender","coffee"],
+    "Dark Aesthetic": ["midnight","graphite","cyber","futuristic"],
+    "Light & Minimal": ["light","paper","sunset","rose"]
   };
 
+  // Build theme sections
   const themeSection = Object.keys(categories).map(category => `
     <div class="theme-section mb-5">
       <h3 class="text-lg font-semibold mb-2">${category}</h3>
@@ -2254,14 +2218,47 @@ function renderThemesView() {
     </div>
   `).join("");
 
-  return `
+  // Add the toggle button dynamically inside Themes view
+  const toggleButtonHTML = `
+    <div class="flex justify-center mb-4">
+      <button id="toggleSettingsBtn" class="px-4 py-2 bg-blue-500 text-white rounded-md shadow">
+        Toggle Settings
+      </button>
+    </div>
+  `;
+
+  // Hide settings button immediately in Themes view
+  const settingsBtn = document.getElementById("openSettingsBtn");
+  if (settingsBtn) settingsBtn.style.display = "none";
+
+  // Combine all content
+  const content = `
     <div class="mobile-optimized p-4 fade-in max-w-md mx-auto">
       <h2 class="text-xl font-bold mb-4 text-center">🎨 Themes</h2>
       <p class="text-base opacity-70 text-center mb-4">Choose a theme category below</p>
+      ${toggleButtonHTML}
       ${themeSection}
     </div>
   `;
+
+  // Return the content to be inserted in the app
+  return content;
 }
+
+// Attach global toggle behavior
+document.addEventListener("click", (event) => {
+  const settingsBtn = document.getElementById("openSettingsBtn");
+  const toggleBtn = document.getElementById("toggleSettingsBtn");
+
+  // Check if the clicked element is the toggle button
+  if (toggleBtn && (event.target === toggleBtn || toggleBtn.contains(event.target))) {
+    if (settingsBtn) {
+      settingsBtn.style.display = settingsBtn.style.display === "none" ? "" : "none";
+    }
+  }
+});
+
+
 
 function formatName(name) {
   return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
