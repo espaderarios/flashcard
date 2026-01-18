@@ -1573,6 +1573,7 @@ english: {
   ]
 },
 
+
   biology: {
     subject: { name: "Biology", icon: "🧬" },
     set: { name: "Basic Biology" },
@@ -1599,6 +1600,115 @@ english: {
       { question: "Study of living organisms?", answer: "Biology" }
     ]
   },
+
+methodsOfResearch: {
+  subject: { name: "Methods of Research", icon: "🔬" },
+  set: { name: "Research Basics" },
+  cards: [
+    { question: "What is research?", answer: "A systematic investigation to establish facts or principles" },
+    { question: "Qualitative research", answer: "Research that focuses on understanding phenomena through observation and interviews" },
+    { question: "Quantitative research", answer: "Research that uses numerical data and statistical analysis" },
+    { question: "Experimental research", answer: "Research involving experiments to test hypotheses" },
+    { question: "Survey research", answer: "Research using questionnaires to collect data from a population" },
+    { question: "Case study", answer: "In-depth study of a particular instance or event" },
+    { question: "Research ethics", answer: "Guidelines for conducting research responsibly and ethically" },
+    { question: "Hypothesis", answer: "A testable statement predicting the outcome of research" },
+    { question: "Literature review", answer: "A summary and evaluation of existing research on a topic" },
+    { question: "Sampling", answer: "Process of selecting a representative group from a population for study" },
+    { question: "Variables", answer: "Elements or factors that can change or be measured in research" },
+    { question: "Independent variable", answer: "The factor that is manipulated to observe its effect" },
+    { question: "Dependent variable", answer: "The factor that is measured to see the effect of changes" },
+    { question: "Control group", answer: "Group in an experiment not exposed to the independent variable" },
+    { question: "Random sampling", answer: "Selecting participants randomly to avoid bias" },
+    { question: "Reliability", answer: "The consistency of a research measurement over time" },
+    { question: "Validity", answer: "The accuracy of a measurement in reflecting what it is supposed to measure" },
+    { question: "Data analysis", answer: "The process of organizing and interpreting collected data" },
+    { question: "Research design", answer: "The overall strategy used to integrate the different components of a study" },
+    { question: "Primary data", answer: "Data collected directly from first-hand sources" },
+    { question: "Secondary data", answer: "Data collected from existing sources or research" }
+  ]
+},
+
+engineeringManagement: {
+  subject: { name: "Engineering Management", icon: "⚙️" },
+  set: { name: "Management Concepts" },
+  cards: [
+    { question: "What is engineering management?", answer: "Application of management principles to engineering projects and teams" },
+    { question: "Project management", answer: "Planning, organizing, and overseeing a project to achieve specific goals" },
+    { question: "Risk management", answer: "Identifying, assessing, and mitigating potential risks in a project" },
+    { question: "Leadership in engineering", answer: "Guiding and motivating technical teams to achieve objectives" },
+    { question: "Quality management", answer: "Ensuring products or services meet defined standards" },
+    { question: "Resource allocation", answer: "Distributing materials, people, and time efficiently for a project" },
+    { question: "Engineering ethics", answer: "Professional standards and moral responsibilities of engineers" },
+    { question: "Decision-making", answer: "Choosing the best course of action among alternatives" },
+    { question: "Cost estimation", answer: "Predicting the financial requirements of a project" },
+    { question: "Time management", answer: "Planning and controlling time to improve efficiency" },
+    { question: "Team building", answer: "Creating a cohesive and effective engineering team" },
+    { question: "Communication skills", answer: "Ability to convey ideas clearly within a team or project" },
+    { question: "Performance evaluation", answer: "Assessing the efficiency and output of team members" },
+    { question: "Process improvement", answer: "Analyzing and enhancing workflows for better productivity" },
+    { question: "Budgeting", answer: "Planning financial resources for projects" },
+    { question: "Conflict resolution", answer: "Managing disagreements effectively within a team" },
+    { question: "Strategic planning", answer: "Defining long-term goals and outlining steps to achieve them" },
+    { question: "Operations management", answer: "Overseeing day-to-day project operations" },
+    { question: "Engineering standards", answer: "Guidelines and regulations that must be followed in engineering projects" },
+    { question: "Documentation", answer: "Keeping detailed records of project plans, progress, and results" }
+  ]
+},
+
+technopreneurship: {
+  subject: { name: "Technopreneurship", icon: "💡" },
+  set: { name: "Entrepreneurship in Tech" },
+  cards: [
+    { question: "What is technopreneurship?", answer: "Entrepreneurship that focuses on technology-based innovations" },
+    { question: "Startup", answer: "A new business focused on growth and innovation" },
+    { question: "Business model", answer: "A plan for how a company creates, delivers, and captures value" },
+    { question: "Pitch deck", answer: "A presentation to attract investors to a startup" },
+    { question: "Innovation", answer: "Developing new ideas, products, or services" },
+    { question: "Funding", answer: "Securing financial resources to grow a business" },
+    { question: "Market research", answer: "Studying market needs, trends, and competitors" },
+    { question: "Product development", answer: "Designing and building a product from concept to launch" },
+    { question: "Entrepreneurial mindset", answer: "Thinking creatively, taking risks, and solving problems" },
+    { question: "Scaling a business", answer: "Growing a startup efficiently to reach more customers" },
+    { question: "Lean startup", answer: "A methodology for developing businesses quickly with minimal waste" },
+    { question: "Value proposition", answer: "The unique value a product or service provides to customers" },
+    { question: "Customer validation", answer: "Testing assumptions by getting feedback from real users" },
+    { question: "Revenue streams", answer: "Ways a business generates income" },
+    { question: "Intellectual property", answer: "Protecting innovations through patents, copyrights, or trademarks" },
+    { question: "Business plan", answer: "A formal document detailing business goals and strategies" },
+    { question: "Networking", answer: "Building professional connections to support growth" },
+    { question: "Competition analysis", answer: "Studying competitors to identify advantages and threats" },
+    { question: "Technology adoption", answer: "Implementing new tech to improve products or services" },
+    { question: "Exit strategy", answer: "Plan for how a founder or investor will leave the business profitably" }
+  ]
+},
+
+thesisOutline: {
+  subject: { name: "Thesis Outline Topics", icon: "📝" },
+  set: { name: "Electronics Engineering Topics" },
+  cards: [
+    { question: "Thesis purpose", answer: "To investigate, analyze, and present findings on a technical problem" },
+    { question: "Title selection", answer: "Choosing a concise and relevant topic for research" },
+    { question: "Abstract", answer: "A summary of the research, methodology, and results" },
+    { question: "Introduction", answer: "Background information and problem statement" },
+    { question: "Literature review", answer: "Survey of existing studies related to the research topic" },
+    { question: "Methodology", answer: "Detailed plan of how the research is conducted" },
+    { question: "Results", answer: "Presentation of data and findings" },
+    { question: "Discussion", answer: "Interpretation and analysis of the results" },
+    { question: "Conclusion", answer: "Summary of findings and recommendations" },
+    { question: "References", answer: "List of all sources cited in the research" },
+    { question: "Problem statement", answer: "The specific issue or question the research addresses" },
+    { question: "Scope and limitations", answer: "Defines boundaries and constraints of the research" },
+    { question: "Research objectives", answer: "Specific goals the research aims to achieve" },
+    { question: "Hypothesis formulation", answer: "Creating a testable prediction based on theory" },
+    { question: "Data collection methods", answer: "Techniques for gathering research data" },
+    { question: "Analysis techniques", answer: "Methods for interpreting and processing data" },
+    { question: "Figures and tables", answer: "Visual representations of data in the thesis" },
+    { question: "Appendices", answer: "Supplementary materials provided at the end of the thesis" },
+    { question: "Acknowledgments", answer: "Section to thank contributors and mentors" },
+    { question: "Future work", answer: "Suggestions for research or development beyond the current study" }
+  ]
+},
 
   geography: {
     subject: { name: "Geography", icon: "🌍" },
@@ -1868,21 +1978,26 @@ function goToThemes() {
 }
 
 function renderBrowseView() {
-const builtInSets = [
-  { id: 'circuits', name: 'Circuits', icon: '⚡', gradient: 'from-yellow-400 to-orange-600', count: 3 },
-  { id: 'math', name: 'Math', icon: '➗', gradient: 'from-blue-400 to-blue-600', count: 22 },
-  { id: 'science', name: 'Science', icon: '🔬', gradient: 'from-green-400 to-green-600', count: 20 },
-  { id: 'english', name: 'English', icon: '📖', gradient: 'from-purple-400 to-purple-600', count: 16 },
-  { id: 'biology', name: 'Biology', icon: '🧬', gradient: 'from-blue-600 to-green-600', count: 20 },
-  { id: 'history', name: 'History', icon: '🏛️', gradient: 'from-yellow-400 to-yellow-600', count: 10 },
-  { id: 'filipino', name: 'Filipino', icon: '🇵🇭', gradient: 'from-yellow-400 to-red-600', count: 10 },
-  { id: 'computer', name: 'ComputerScience', icon: '💻', gradient: 'from-pink-400 to-pink-600', count: 10 },
-  { id: 'geography', name: 'Geography', icon: '🌍', gradient: 'from-teal-400 to-teal-600', count: 10 },
-  { id: 'chemistry', name: 'Chemistry', icon: '⚗️', gradient: 'from-indigo-400 to-indigo-600', count: 10 },
-  { id: 'physics', name: 'Physics', icon: '🪐', gradient: 'from-gray-400 to-gray-600', count: 10 },
-  { id: 'art', name: 'Art', icon: '🎨', gradient: 'from-red-400 to-red-600', count: 10 }
-];
+  const builtInSets = [
+    { id: 'circuits', name: 'Circuits', icon: '⚡', gradient: 'from-yellow-400 to-orange-600', count: 3 },
+    { id: 'math', name: 'Math', icon: '➗', gradient: 'from-blue-400 to-blue-600', count: 22 },
+    { id: 'science', name: 'Science', icon: '🔬', gradient: 'from-green-400 to-green-600', count: 20 },
+    { id: 'english', name: 'English', icon: '📖', gradient: 'from-purple-400 to-purple-600', count: 16 },
+    { id: 'biology', name: 'Biology', icon: '🧬', gradient: 'from-blue-600 to-green-600', count: 20 },
+    { id: 'history', name: 'History', icon: '🏛️', gradient: 'from-yellow-400 to-yellow-600', count: 10 },
+    { id: 'filipino', name: 'Filipino', icon: '🇵🇭', gradient: 'from-yellow-400 to-red-600', count: 10 },
+    { id: 'computer', name: 'ComputerScience', icon: '💻', gradient: 'from-pink-400 to-pink-600', count: 10 },
+    { id: 'geography', name: 'Geography', icon: '🌍', gradient: 'from-teal-400 to-teal-600', count: 10 },
+    { id: 'chemistry', name: 'Chemistry', icon: '⚗️', gradient: 'from-indigo-400 to-indigo-600', count: 10 },
+    { id: 'physics', name: 'Physics', icon: '🪐', gradient: 'from-gray-400 to-gray-600', count: 10 },
+    { id: 'art', name: 'Art', icon: '🎨', gradient: 'from-red-400 to-red-600', count: 10 },
 
+    // Electronics Engineering–related sets
+    { id: 'methodsOfResearch', name: 'Methods of Research', icon: '🔬', gradient: 'from-green-400 to-green-600', count: 21 },
+    { id: 'engineeringManagement', name: 'Engineering Management', icon: '⚙️', gradient: 'from-blue-400 to-blue-600', count: 20 },
+    { id: 'technopreneurship', name: 'Technopreneurship', icon: '💡', gradient: 'from-yellow-400 to-yellow-600', count: 20 },
+    { id: 'thesisOutline', name: 'Thesis Outline', icon: '📝', gradient: 'from-purple-400 to-purple-600', count: 20 }
+  ];
 
   const setsHTML = builtInSets.map(set => `
     <div 
