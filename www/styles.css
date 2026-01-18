@@ -1936,7 +1936,13 @@ input[type="file"]::-webkit-file-upload-button:hover {
 }
 
 .pdf-content-area {
+  overflow: hidden;
+  position: relative;
   margin-bottom: 8px;
+}
+
+#pdf-canvas {
+  transition: transform 0.25s ease;
 }
 
 .pdf-footer {

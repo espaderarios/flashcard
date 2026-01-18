@@ -1709,6 +1709,9 @@ let pageNum = 1;
 let scale = 1.0;
 let readingMode = false;
 let canvas, ctx, pdfDoc;
+let touchStartX = 0;
+let touchEndX = 0;
+const swipeThreshold = 50;
 let currentStudent = {
   name: "",
   id: ""
@@ -2551,7 +2554,66 @@ async function loadPdf(url) {
     hideLoadingIndicator();
     showToast('Error loading PDF. Please try again.');
   }
+
+ setupPdfSwipe();
+
 }
+
+function handlePdfSwipe() {
+  const deltaX = touchEndX - touchStartX;
+
+  if (Math.abs(deltaX) < swipeThreshold) return;
+
+  const direction = deltaX > 0 ? -1 : 1; // right = prev, left = next
+
+  // Animate swipe
+  canvas.style.transform = `translateX(${direction * 100}%)`;
+  setTimeout(() => {
+    canvas.style.transition = 'none';
+    canvas.style.transform = 'translateX(0)';
+    canvas.offsetHeight; // force reflow
+    canvas.style.transition = 'transform 0.25s ease';
+
+    if (direction > 0) nextPage();
+    else previousPage();
+  }, 200);
+}
+
+
+function setupPdfSwipe() {
+  const container = document.getElementById("pdf-content");
+  if (!container) return;
+
+  // Remove any existing listeners
+  container.ontouchstart = null;
+  container.ontouchend = null;
+  container.onmousedown = null;
+  container.onmouseup = null;
+
+  let mouseDown = false;
+
+  container.addEventListener("touchstart", (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+  });
+
+  container.addEventListener("touchend", (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    handlePdfSwipe();
+  });
+
+  container.addEventListener("mousedown", (e) => {
+    mouseDown = true;
+    touchStartX = e.screenX;
+  });
+
+  container.addEventListener("mouseup", (e) => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    touchEndX = e.screenX;
+    handlePdfSwipe();
+  });
+}
+
 
 function renderPdfViewerView() {
   const pdf = window.currentPdf;
