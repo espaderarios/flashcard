@@ -1712,6 +1712,7 @@ let canvas, ctx, pdfDoc;
 let touchStartX = 0;
 let touchEndX = 0;
 const swipeThreshold = 50;
+let isFullscreen = false;
 let currentStudent = {
   name: "",
   id: ""
@@ -2858,17 +2859,84 @@ function zoomOut() {
   renderPage(pageNum);
 }
 
-// Fullscreen toggle
 function toggleFullscreen() {
   const container = document.querySelector(".pdf-viewer-container");
   if (!container) return;
 
   if (!document.fullscreenElement) {
+    // Enter fullscreen
     container.requestFullscreen().catch(err => console.log(err));
   } else {
+    // Exit fullscreen
     document.exitFullscreen();
   }
 }
+
+// Listen for fullscreen changes
+document.addEventListener("fullscreenchange", () => {
+  const isFull = !!document.fullscreenElement;
+  const container = document.querySelector(".pdf-viewer-container");
+  const canvas = document.getElementById("pdf-canvas");
+
+  // Update global flag
+  isFullscreen = isFull;
+
+  // Show/hide UI
+  hidePdfUI(isFull);
+
+  if (canvas) {
+    if (isFull) {
+      canvas.style.width = "100vw";
+      canvas.style.height = "100vh";
+      canvas.style.objectFit = "contain";
+    } else {
+      canvas.style.objectFit = "initial";
+      // Re-render current page to reset canvas size
+      if (pdfDoc) renderPage(pageNum);
+    }
+  }
+});
+
+
+function hidePdfUI(hide = true) {
+  const header = document.querySelector(".pdf-header");
+  const toolbar = document.getElementById("pdf-toolbar");
+  const footer = document.querySelector(".pdf-footer");
+
+  [header, toolbar, footer].forEach(el => {
+    if (el) el.style.display = hide ? "none" : "";
+  });
+}
+
+document.addEventListener("fullscreenchange", () => {
+  const canvas = document.getElementById("pdf-canvas");
+  const header = document.querySelector(".pdf-header");
+  const toolbar = document.getElementById("pdf-toolbar");
+  const footer = document.querySelector(".pdf-footer");
+
+  const isFull = !!document.fullscreenElement;
+  isFullscreen = isFull;
+
+  // SHOW UI when NOT fullscreen, HIDE UI when fullscreen
+  [header, toolbar, footer].forEach(el => {
+    if (el) el.style.display = isFull ? "none" : "";
+  });
+
+  if (canvas) {
+    if (isFull) {
+      canvas.style.width = "100vw";
+      canvas.style.height = "100vh";
+      canvas.style.objectFit = "contain";
+    } else {
+      canvas.style.objectFit = "initial";
+      // Re-render page to reset canvas size
+      if (pdfDoc) renderPage(pageNum);
+    }
+  }
+});
+
+
+
 
 function toggleReadingMode() {
   readingMode = !readingMode;
