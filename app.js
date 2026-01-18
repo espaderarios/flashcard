@@ -17,203 +17,6 @@ const STUDENT_CLASSES_KEY = "student_enrolled_classes";
 const TEACHER_CLASSES_KEY = "teacher_classes";
 const CLASS_QUIZZES_KEY = "class_quizzes";
 
-// ============= STORAGE FUNCTIONS FOR NEW FEATURES =============
-
-// Student Profile Storage
-function saveStudentProfile(profileData) {
-  const profile = {
-    ...window.currentStudent,
-    ...profileData,
-    updatedAt: new Date().toISOString()
-  };
-  localStorage.setItem(STUDENT_PROFILE_KEY, JSON.stringify(profile));
-  window.currentStudent = profile;
-  return profile;
-}
-
-function getStudentProfile() {
-  const profile = JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "null");
-  return profile || window.currentStudent || {};
-}
-
-function getStudentById(studentId) {
-  // First, try to find the student in enrollment data (which now includes names)
-  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
-  const enrollment = enrolledClasses.find(e => e.studentId === studentId && e.studentName);
-  
-  if (enrollment && enrollment.studentName) {
-    return {
-      id: studentId,
-      name: enrollment.studentName
-    };
-  }
-  
-  // Try to get from individual student profile (current student)
-  if (window.currentStudent && window.currentStudent.id === studentId) {
-    return window.currentStudent;
-  }
-  
-  // Try to get from stored student profile
-  const profile = JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "null");
-  if (profile && profile.id === studentId) {
-    return profile;
-  }
-  
-  // Fallback to unknown student
-  return { id: studentId, name: 'Unknown Student' };
-}
-
-// Class Storage
-function saveClass(classData) {
-  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
-  const classId = classData.id || `class_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  const classObj = {
-    ...classData,
-    id: classId,
-    createdAt: classData.createdAt || new Date().toISOString(),
-  };
-  
-  const existingIndex = classes.findIndex(c => c.id === classId);
-  if (existingIndex >= 0) {
-    classes[existingIndex] = classObj;
-  } else {
-    classes.push(classObj);
-  }
-  
-  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(classes));
-  return classObj;
-}
-
-function getTeacherClasses(teacherId) {
-  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
-  return classes.filter(c => c.teacherId === teacherId);
-}
-
-function getClassById(classId) {
-  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
-  return classes.find(c => c.id === classId);
-}
-
-function deleteClass(classId) {
-  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
-  const filtered = classes.filter(c => c.id !== classId);
-  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
-}
-
-// Student Class Enrollment (Enhanced for Cross-Device Support)
-function enrollStudentInClass(classCode, studentInfo = null) {
-  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
-  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
-  
-  const classToEnroll = allClasses.find(c => c.classCode === classCode);
-  if (!classToEnroll) {
-    return { success: false, error: "Invalid class code" };
-  }
-  
-  // Try multiple methods to get student ID
-  let studentId = window.currentStudent?.id || 
-                  localStorage.getItem('currentStudentId') || 
-                  studentInfo?.id;
-  
-  // If no student ID exists, create one based on device/user info
-  if (!studentId) {
-    // Create a persistent student ID based on browser fingerprint + timestamp
-    const deviceId = localStorage.getItem('deviceId') || 
-                   'student_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('deviceId', deviceId);
-    studentId = deviceId;
-    
-    // Create basic student profile if none exists
-    if (!window.currentStudent && !studentInfo) {
-      studentInfo = {
-        id: studentId,
-        name: `Student ${deviceId.slice(-6)}`, // Use last 6 chars as default name
-        email: '',
-        createdAt: new Date().toISOString()
-      };
-      saveStudentProfile(studentInfo);
-    }
-  }
-  
-  // Check if already enrolled (more flexible check)
-  const alreadyEnrolled = enrolledClasses.find(e => 
-    e.classId === classToEnroll.id && 
-    (e.studentId === studentId || e.deviceId === studentId)
-  );
-  if (alreadyEnrolled) {
-    return { success: false, error: "Already enrolled in this class" };
-  }
-  
-  // Create enrollment with cross-device support
-  const enrollment = {
-    classId: classToEnroll.id,
-    className: classToEnroll.name,
-    teacherId: classToEnroll.teacherId,
-    studentId: studentId,
-    deviceId: studentId, // Store deviceId for cross-device sync
-    studentName: studentInfo?.name || window.currentStudent?.name || `Student ${studentId.slice(-6)}`,
-    enrolledAt: new Date().toISOString(),
-    lastAccessed: new Date().toISOString(),
-    deviceInfo: {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      timestamp: new Date().toISOString()
-    }
-  };
-  
-  enrolledClasses.push(enrollment);
-  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(enrolledClasses));
-  
-  // Store current student info for this session
-  localStorage.setItem('currentStudentId', studentId);
-  if (studentInfo) {
-    window.currentStudent = studentInfo;
-  }
-  
-  return { success: true, classId: classToEnroll.id, studentId };
-}
-
-function getStudentEnrolledClasses(studentId) {
-  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
-  
-  // Enhanced filtering for cross-device support
-  return enrolledClasses.filter(e => {
-    // Include enrollments that match studentId OR deviceId
-    const matchesById = e.studentId && e.studentId === studentId;
-    const matchesByDevice = e.deviceId && e.deviceId === studentId;
-    
-    return matchesById || matchesByDevice;
-  });
-}
-
-// Fix old enrollments that don't have studentId by removing them (clean data)
-function cleanOldEnrollments() {
-  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
-  const cleanedClasses = enrolledClasses.filter(e => e.studentId); // Keep only enrollments with studentId
-  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(cleanedClasses));
-}
-
-function getClassQuizzes(classId) {
-  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
-  return allQuizzes.filter(q => q.classId === classId);
-}
-
-function saveClassQuiz(quizData) {
-  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
-  const quizId = quizData.id || `classquiz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  const quiz = {
-    ...quizData,
-    id: quizId,
-    createdAt: quizData.createdAt || new Date().toISOString(),
-  };
-  
-  allQuizzes.push(quiz);
-  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(allQuizzes));
-  return quiz;
-}
-
 function shuffleArray(array) {
   return array
     .map(value => ({ value, sort: Math.random() }))
@@ -248,6 +51,153 @@ function clearTeacherDraft() {
   localStorage.removeItem(TEACHER_DRAFT_KEY);
 }
 
+// ============= PROFILE & CLASS STORAGE FUNCTIONS =============
+
+function saveStudentProfile(profileData) {
+  localStorage.setItem(STUDENT_PROFILE_KEY, JSON.stringify(profileData));
+}
+
+function getStudentProfile() {
+  const profile = JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "{}");
+  return profile || {
+    name: window.currentStudent?.name || "",
+    id: window.currentStudent?.id || "",
+    email: "",
+    school: "",
+    grade: "",
+    profilePictureUrl: null,
+    googleId: null,
+    googleEmail: null
+  };
+}
+
+function saveClass(classData) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const exists = classes.find(c => c.id === classData.id);
+  
+  if (exists) {
+    Object.assign(exists, classData);
+  } else {
+    classes.push(classData);
+  }
+  
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(classes));
+}
+
+function getTeacherClasses(teacherId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  return classes.filter(c => c.teacherId === teacherId);
+}
+
+function getClassById(classId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  return classes.find(c => c.id === classId);
+}
+
+function deleteClass(classId) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const filtered = classes.filter(c => c.id !== classId);
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
+}
+
+function enrollStudentInClass(classCode) {
+  const classes = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  const targetClass = classes.find(c => c.classCode === classCode);
+  
+  if (!targetClass) {
+    return { success: false, error: "Invalid class code" };
+  }
+  
+  const studentId = window.currentStudent?.id;
+  if (!studentId) {
+    return { success: false, error: "Student ID not found" };
+  }
+  
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  const alreadyEnrolled = enrolledClasses.some(e => e.classId === targetClass.id && e.studentId === studentId);
+  
+  if (alreadyEnrolled) {
+    return { success: false, error: "Already enrolled in this class" };
+  }
+  
+  const enrollment = {
+    classId: targetClass.id,
+    className: targetClass.name,
+    teacherId: targetClass.teacherId,
+    studentId: studentId,
+    enrolledAt: new Date().toISOString()
+  };
+  
+  enrolledClasses.push(enrollment);
+  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(enrolledClasses));
+  
+  return { success: true };
+}
+
+function getStudentEnrolledClasses(studentId = null) {
+  if (!studentId) {
+    studentId = window.currentStudent?.id;
+  }
+  
+  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
+  return enrolledClasses.filter(e => e.studentId === studentId);
+}
+
+function getClassQuizzes(classId) {
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  return classQuizzes.filter(q => q.classId === classId);
+}
+
+function saveClassQuiz(quizData) {
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const exists = classQuizzes.find(q => q.id === quizData.id && q.classId === quizData.classId);
+  
+  if (exists) {
+    Object.assign(exists, quizData);
+  } else {
+    classQuizzes.push(quizData);
+  }
+  
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes));
+}
+
+function getLetterGrade(percentage) {
+  if (percentage >= 90) return 'A';
+  if (percentage >= 80) return 'B';
+  if (percentage >= 70) return 'C';
+  if (percentage >= 60) return 'D';
+  return 'F';
+}
+
+function getGradeColor(grade) {
+  switch(grade) {
+    case 'A': return '#22c55e'; // green
+    case 'B': return '#3b82f6'; // blue
+    case 'C': return '#f59e0b'; // orange
+    case 'D': return '#ef4444'; // red
+    case 'F': return '#7f1d1d'; // dark red
+    default: return 'var(--primary)';
+  }
+}
+
+function getStudentQuizAttempts(studentId, quizId) {
+  const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
+  return Object.values(scores).filter(s => s.studentId === studentId && s.quizId === quizId) || [];
+}
+
+function getQuizAttemptLimit(classId, quizId) {
+  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
+  const key = `${classId}_${quizId}`;
+  return limits[key] || 3; // Default 3 attempts
+}
+
+function setQuizAttemptLimit(classId, quizId, limit) {
+  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
+  const key = `${classId}_${quizId}`;
+  limits[key] = limit;
+  localStorage.setItem('quizAttemptLimits', JSON.stringify(limits));
+}
+
 function initTeacherView() {
   // 1️⃣ Restore draft
   const draft = loadTeacherDraft();
@@ -272,479 +222,19 @@ function initTeacherView() {
   });
 }
 
-// Detect if running on Render or localhost
-function isProduction() {
-  const hostname = window.location.hostname;
-  return hostname !== 'localhost' && hostname !== '127.0.0.1';
-}
+const AI_API_URL =
+  "https://flashcards-ai-backend.onrender.com/api/generate-cards";
 
-// Get backend URL - always use Render backend for API calls
+// Get backend URL - use from localStorage or default
 function getBackendUrl() {
-  // Always use the Render backend, even when frontend is on GitHub Pages
-  return localStorage.getItem('backendUrl') || 'https://flashcardrio.onrender.com';
-}
-
-// Get Cloudflare backend URL for quiz submission and results
-function getCloudflareUrl() {
-  return localStorage.getItem('cloudflareUrl') || 'https://flashcard-worker.espaderarios.workers.dev';
+  return localStorage.getItem('backendUrl') || 'http://localhost:5000';
 }
 
 // Set backend URL (can be called to configure)
 function setBackendUrl(url) {
   localStorage.setItem('backendUrl', url.replace(/\/$/, '')); // Remove trailing slash
-  toast(`✅ Render backend URL set to: ${url}`);
+  toast(`✅ Backend URL set to: ${url}`);
 }
-
-// Set Cloudflare backend URL (can be called to configure)
-function setCloudflareUrl(url) {
-  localStorage.setItem('cloudflareUrl', url.replace(/\/$/, '')); // Remove trailing slash
-  toast(`✅ Cloudflare backend URL set to: ${url}`);
-}
-
-// Cross-Device Student Data Sync
-function initializeCrossDeviceSupport() {
-  // Ensure deviceId exists for cross-device support
-  if (!localStorage.getItem('deviceId')) {
-    const deviceId = 'student_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('deviceId', deviceId);
-    console.log('Created deviceId for cross-device support:', deviceId);
-  }
-  
-  // Migrate old student data to new format
-  const currentStudentId = localStorage.getItem('currentStudentId');
-  const deviceId = localStorage.getItem('deviceId');
-  
-  // If no current student but we have a deviceId, create basic student profile
-  if (!currentStudentId && deviceId) {
-    const studentProfile = {
-      id: deviceId,
-      name: `Student ${deviceId.slice(-6)}`,
-      email: '',
-      createdAt: new Date().toISOString(),
-      lastSync: new Date().toISOString()
-    };
-    
-    saveStudentProfile(studentProfile);
-    window.currentStudent = studentProfile;
-    localStorage.setItem('currentStudentId', deviceId);
-    
-    console.log('Created student profile for cross-device support');
-  }
-  
-  // Clean up old enrollments that don't have proper IDs
-  cleanOldEnrollments();
-  
-  console.log('Cross-device support initialized');
-}
-
-// Auto-sync function to update last accessed time
-function updateClassAccess(classId) {
-  const enrolledClasses = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]");
-  const enrollment = enrolledClasses.find(e => e.classId === classId);
-  
-  if (enrollment) {
-    enrollment.lastAccessed = new Date().toISOString();
-    enrollment.deviceInfo = {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      timestamp: new Date().toISOString()
-    };
-    
-    localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(enrolledClasses));
-  }
-}
-
-// ============= CLOUD BACKUP FUNCTIONS =============
-
-/**
- * Backup all user data to Cloudflare
- * Includes classes, students, enrollments, and quiz results
- */
-async function backupAllDataToCloudflare() {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    const userId = getUserId();
-    
-    // Collect all important data
-    const backupData = {
-      userId: userId,
-      timestamp: new Date().toISOString(),
-      data: {
-        // Classes data
-        classes: JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]"),
-        
-        // Student enrollments
-        enrollments: JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]"),
-        
-        // Student profiles
-        studentProfiles: JSON.parse(localStorage.getItem(STUDENT_PROFILE_KEY) || "{}"),
-        
-        // Quiz drafts
-        quizDrafts: JSON.parse(localStorage.getItem(TEACHER_DRAFT_KEY) || "{}"),
-        
-        // User data
-        userData: JSON.parse(localStorage.getItem('user') || "{}"),
-        
-        // Quiz scores
-        quizScores: JSON.parse(localStorage.getItem('quizScores') || "{}"),
-        
-        // Imported PDFs
-        importedPdfs: JSON.parse(localStorage.getItem('imported-pdfs') || "[]"),
-        
-        // Settings and preferences
-        settings: {
-          backendUrl: getBackendUrl(),
-          cloudflareUrl: getCloudflareUrl(),
-          theme: localStorage.getItem('theme') || 'light',
-          fontSize: localStorage.getItem('fontSize') || '16',
-        }
-      }
-    };
-    
-    const response = await fetch(`${cloudflareUrl}/api/backup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(backupData)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Backup failed with status ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('Backup successful:', result);
-    
-    // Store backup ID locally for restore functionality
-    localStorage.setItem('lastBackupId', result.backupId);
-    localStorage.setItem('lastBackupTime', backupData.timestamp);
-    
-    showToast('✅ All data backed up successfully!');
-    return result;
-    
-  } catch (error) {
-    console.error('Backup error:', error);
-    showToast('❌ Backup failed: ' + error.message);
-    throw error;
-  }
-}
-
-/**
- * Restore all data from Cloudflare backup
- */
-async function restoreAllDataFromCloudflare(backupId) {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    
-    const response = await fetch(`${cloudflareUrl}/api/backup/${backupId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Restore failed with status ${response.status}`);
-    }
-    
-    const result = await response.json();
-    const backupData = result.backup;
-    
-    if (!backupData || !backupData.data) {
-      throw new Error('Invalid backup data');
-    }
-    
-    // Restore all data
-    const data = backupData.data;
-    
-    // Restore classes
-    if (data.classes) {
-      localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(data.classes));
-    }
-    
-    // Restore enrollments
-    if (data.enrollments) {
-      localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(data.enrollments));
-    }
-    
-    // Restore student profiles
-    if (data.studentProfiles) {
-      localStorage.setItem(STUDENT_PROFILE_KEY, JSON.stringify(data.studentProfiles));
-    }
-    
-    // Restore quiz drafts
-    if (data.quizDrafts) {
-      localStorage.setItem(TEACHER_DRAFT_KEY, JSON.stringify(data.quizDrafts));
-    }
-    
-    // Restore user data
-    if (data.userData) {
-      localStorage.setItem('user', JSON.stringify(data.userData));
-    }
-    
-    // Restore quiz scores
-    if (data.quizScores) {
-      localStorage.setItem('quizScores', JSON.stringify(data.quizScores));
-    }
-    
-    // Restore imported PDFs
-    if (data.importedPdfs) {
-      localStorage.setItem('imported-pdfs', JSON.stringify(data.importedPdfs));
-    }
-    
-    // Restore settings
-    if (data.settings) {
-      if (data.settings.backendUrl) {
-        setBackendUrl(data.settings.backendUrl);
-      }
-      if (data.settings.cloudflareUrl) {
-        setCloudflareUrl(data.settings.cloudflareUrl);
-      }
-      if (data.settings.theme) {
-        localStorage.setItem('theme', data.settings.theme);
-      }
-      if (data.settings.fontSize) {
-        localStorage.setItem('fontSize', data.settings.fontSize);
-      }
-    }
-    
-    console.log('Restore successful:', backupData.timestamp);
-    showToast(`✅ Data restored from backup (${new Date(backupData.timestamp).toLocaleDateString()})`);
-    
-    // Refresh the app to show restored data
-    setTimeout(() => {
-      renderApp();
-    }, 1000);
-    
-    return result;
-    
-  } catch (error) {
-    console.error('Restore error:', error);
-    showToast('❌ Restore failed: ' + error.message);
-    throw error;
-  }
-}
-
-/**
- * Get list of all backups for current user
- */
-async function getUserBackups() {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    const userId = getUserId();
-    
-    const response = await fetch(`${cloudflareUrl}/api/backups/${userId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch backups with status ${response.status}`);
-    }
-    
-    const result = await response.json();
-    return result.backups || [];
-    
-  } catch (error) {
-    console.error('Get backups error:', error);
-    showToast('❌ Failed to fetch backups');
-    return [];
-  }
-}
-
-/**
- * Delete a specific backup
- */
-async function deleteBackup(backupId) {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    
-    const response = await fetch(`${cloudflareUrl}/api/backup/${backupId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to delete backup with status ${response.status}`);
-    }
-    
-    const result = await response.json();
-    showToast('✅ Backup deleted successfully');
-    return result;
-    
-  } catch (error) {
-    console.error('Delete backup error:', error);
-    showToast('❌ Failed to delete backup');
-    throw error;
-  }
-}
-
-/**
- * Auto-backup function - can be called periodically
- */
-async function autoBackup() {
-  try {
-    const lastBackupTime = localStorage.getItem('lastBackupTime');
-    const now = new Date();
-    
-    // Auto-backup every 24 hours
-    if (lastBackupTime) {
-      const lastBackup = new Date(lastBackupTime);
-      const hoursSinceBackup = (now - lastBackup) / (1000 * 60 * 60);
-      
-      if (hoursSinceBackup < 24) {
-        console.log('Auto-backup skipped - recent backup exists');
-        return;
-      }
-    }
-    
-    await backupAllDataToCloudflare();
-    console.log('Auto-backup completed');
-    
-  } catch (error) {
-    console.error('Auto-backup failed:', error);
-  }
-}
-
-// ============= CLOUDFLARE QUIZ OPERATIONS =============
-
-/**
- * Submit quiz answers to Cloudflare backend
- * POST /api/submit
- */
-async function submitQuizToCloudflare(quizId, answers) {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    
-    const response = await fetch(`${cloudflareUrl}/api/submit`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        quizId,
-        answers,
-        studentName: window.currentStudent?.name || 'Anonymous',
-        studentId: window.currentStudent?.id || 'unknown',
-        score: quizScore,
-        totalQuestions: quizQuestions.length,
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Cloudflare API returned ${response.status}: ${errorText}`);
-      throw new Error(`HTTP ${response.status} - Failed to submit quiz results`);
-    }
-
-    const data = await response.json();
-    console.log('Quiz submitted successfully:', data);
-    return data;
-  } catch (error) {
-    console.error('Cloudflare submit error:', error);
-    throw error;
-  }
-}
-
-/**
- * Get quiz results from Cloudflare backend
- * GET /api/results/:quizId
- */
-async function getQuizResultsFromCloudflare(quizId) {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    
-    const response = await fetch(`${cloudflareUrl}/api/results/${quizId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Cloudflare get results error:', error);
-    throw error;
-  }
-}
-
-/**
- * Create quiz on Cloudflare backend
- * POST /api/quizzes
- */
-async function createQuizOnCloudflare(title, questions) {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    
-    const response = await fetch(`${cloudflareUrl}/api/quizzes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title,
-        questions
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Cloudflare create quiz error:', error);
-    throw error;
-  }
-}
-
-/**
- * Get quiz from Cloudflare backend
- * GET /api/quizzes/:quizId
- */
-async function getQuizFromCloudflare(quizId) {
-  try {
-    const cloudflareUrl = getCloudflareUrl();
-    console.log(`Fetching quiz from: ${cloudflareUrl}/api/quizzes/${quizId}`);
-    
-    const response = await fetch(`${cloudflareUrl}/api/quizzes/${quizId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Cloudflare API returned ${response.status}: ${errorText}`);
-      throw new Error(`HTTP ${response.status} - Quiz may not exist or has expired`);
-    }
-
-    const data = await response.json();
-    
-    // Return quiz object directly (not wrapped in success property)
-    if (data.quiz) {
-      return data.quiz;
-    }
-    return data;
-  } catch (error) {
-    console.error('Cloudflare get quiz error:', error);
-    throw error;
-  }
-}
-
-const AI_API_URL = getBackendUrl() + "/api/generate-cards";
 
 const defaultConfig = {
   app_title: "Flashcard Study",
@@ -1499,36 +989,98 @@ const COLOR_PALETTES = {
 
 
 const BUILT_IN_SETS = {
-circuits: {
-  subject: {
-    name: "Circuits",
-    icon: "⚡"
+  circuits: {
+    subject: { name: "Circuits", icon: "⚡" },
+    set: { name: "Circuit Analysis", description: "Learn to analyze and solve electrical circuits" },
+    cards: [
+      {
+        question: "Analyze this series circuit and find the total resistance:",
+        questionImage: "CircuitsImg/CircuitsQ1.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>i</mi><mn>1</mn></msub>
+  <mo>=</mo>
+  <mn>9</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>i</mi><mn>2</mn></msub>
+  <mo>=</mo>
+  <mn>2.5</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>i</mi><mn>3</mn></msub>
+  <mo>=</mo>
+  <mn>2</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA1.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+      {
+        question: "Calculate the current through this parallel circuit:",
+        questionImage: "CircuitsImg/CircuitsQ2.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <msub><mi>I</mi><mn>1</mn></msub>
+  <mo>=</mo>
+  <mo>&#x2212;</mo>
+  <mn>3</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>I</mi><mn>2</mn></msub>
+  <mo>=</mo>
+  <mo>&#x2212;</mo>
+  <mn>2</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>I</mi><mn>3</mn></msub>
+  <mo>=</mo>
+  <mn>0</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA2.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+      {
+        question: "Find the voltage across each resistor in this circuit:",
+        questionImage: "CircuitsImg/CircuitsQ3.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mtable columnalign="right left right left right left" rowspacing="3pt" columnspacing="0em 2em 0em 2em 0em 2em" displaystyle="true">
+    <mtr>
+      <mtd><msub><mi>I</mi><mn>1</mn></msub></mtd>
+      <mtd>= 7.403 <mi>A</mi></mtd>
+    </mtr>
+    <mtr>
+      <mtd><msub><mi>I</mi><mn>2</mn></msub></mtd>
+      <mtd>= 1.26 <mi>A</mi></mtd>
+    </mtr>
+    <mtr>
+      <mtd><msub><mi>I</mi><mn>3</mn></msub></mtd>
+      <mtd>= 5.97 <mi>A</mi></mtd>
+    </mtr>
+  </mtable>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA3.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      }
+    ]
   },
-  set: {
-    name: "Circuit Analysis",
-    description: "Learn to analyze and solve electrical circuits"
-  },
-  cards: [
-    {
-      question: "Analyze this series circuit and find the total resistance:",
-      questionImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk3OTdhNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkNpcmN1aXQgRG9jdW1lbnQ8L3RleHQ+Cjwvc3ZnPg==",
-      answer: "Total resistance = R1 + R2 + R3 = 2Ω + 4Ω + 6Ω = 12Ω",
-      answerImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWNmYWRmIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzE2YTQ1YSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlNvbHV0aW9uOiAxMjbCqDwvdGV4dD4KPC9zdmc+"
-    },
-    {
-      question: "Calculate the current through this parallel circuit:",
-      questionImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk3OTdhNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlBhcmFsbGVsIENpcmN1aXQ8L3RleHQ+Cjwvc3ZnPg==",
-      answer: "Total resistance = 1/(1/R1 + 1/R2 + 1/R3) = 1/(1/6 + 1/3 + 1/2) = 1Ω. Current = V/R = 12V/1Ω = 12A",
-      answerImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWNmYWRmIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzE2YTQ1YSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkkgPSAxMkE8L3RleHQ+Cjwvc3ZnPg=="
-    },
-    {
-      question: "Find the voltage across each resistor in this circuit:",
-      questionImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk3OTdhNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlZvbHRhZ2UgRGl2aWRlcjwvdGV4dD4KPC9zdmc+",
-      answer: "V1 = (R1/(R1+R2))×V = (2/(2+4))×10V = 3.33V, V2 = (R2/(R1+R2))×V = (4/(2+4))×10V = 6.67V",
-      answerImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWNmYWRmIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzE2YTQ1YSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlYxID0gMy4zM1YsIFYyID0gNi42N1Y8L3RleHQ+Cjwvc3ZnPg=="
-    }
-  ]
-},
 
 math: {
   subject: {
@@ -1823,7 +1375,6 @@ let teacherQuizIndex = 0;
 let teacherQuizScore = 0;
 let isTeacherQuiz = false;
 let currentQuizId = null;
-let teacherQuizzes = [];
 let isStudentLocked = false;
 let studentTab = "main";   
 let teacherTab = "main";
@@ -2062,11 +1613,11 @@ function renderBrowseCardsView() {
           <div class="font-medium text-text mb-2">
             ${card.question}
           </div>
-          ${card.questionImage ? `<img src="${card.questionImage}" alt="Question diagram" class="w-full max-w-sm rounded-lg mb-3 border" onerror="this.style.display='none'">` : ''}
+          ${card.questionImage ? `<img src="${card.questionImage}" alt="Question diagram" class="w-full max-w-xl rounded-lg mb-3 border" onerror="this.style.display='none'">` : ''}
           <div class="text-text-muted text-sm">
             ${card.answer}
           </div>
-          ${card.answerImage ? `<img src="${card.answerImage}" alt="Answer solution" class="w-full max-w-sm rounded-lg mt-2 border" onerror="this.style.display='none'">` : ''}
+          ${card.answerImage ? `<img src="${card.answerImage}" alt="Answer solution" class="w-full max-w-xl rounded-lg mt-2 border" onerror="this.style.display='none'">` : ''}
         </div>
       </div>
     </div>
@@ -2133,6 +1684,8 @@ function renderBrowseStudyView() {
 
   return `
     <div class="p-6 max-w-lg mx-auto fade-in">
+
+      <!-- Back button & progress -->
       <div class="mb-6">
         <button class="btn-secondary mb-4" onclick="backToBrowseCards()">
           ← Back to Cards
@@ -2147,7 +1700,8 @@ function renderBrowseStudyView() {
         </div>
       </div>
 
-      <div class="card-study p-8 rounded-xl text-center mb-6"
+      <!-- Flashcard image -->
+      <div class="card-study p-0 rounded-xl text-center mb-4"
            style="background: var(--card-bg); perspective: 1000px; box-shadow: var(--shadow-lg);">
 
         <div class="card-inner ${isBrowseCardFlipped ? 'flipped' : ''}"
@@ -2158,41 +1712,60 @@ function renderBrowseStudyView() {
                cursor: pointer;
                position: relative;
                width: 100%;
-               min-height: 200px;
+               min-height: 260px;
                border-radius: var(--radius);
              ">
 
-          <div class="card-front absolute inset-0 flex items-center justify-center p-6 rounded-xl"
-               style="backface-visibility: hidden; background: var(--card-bg);">
-            <div class="text-center">
-              <div class="text-primary text-2xl mb-4">❓</div>
-              <h3 class="font-semibold text-xl text-text mb-4">Question</h3>
-              <p class="text-text text-lg leading-relaxed mb-4">${card.question}</p>
-              ${card.questionImage ? `<img src="${card.questionImage}" alt="Question diagram" class="w-full max-w-xs rounded-lg border mx-auto" onerror="this.style.display='none'">` : ''}
-            </div>
+          <!-- FRONT -->
+          <div class="card-front absolute inset-0 rounded-xl overflow-hidden"
+               style="backface-visibility: hidden;">
+            <img src="${card.questionImage || ''}"
+                 class="w-full h-full object-contain"
+                 alt="Question image">
           </div>
 
-          <div class="card-back absolute inset-0 flex items-center justify-center p-6 rounded-xl"
-               style="
-                 backface-visibility: hidden;
-                 transform: rotateY(180deg);
-                 background: var(--card-bg);
-               ">
-            <div class="text-center">
-              <div class="text-success text-2xl mb-4">✅</div>
-              <h3 class="font-semibold text-xl text-text mb-4">Answer</h3>
-              <p class="text-text text-lg leading-relaxed mb-4">${card.answer}</p>
-              ${card.answerImage ? `<img src="${card.answerImage}" alt="Answer solution" class="w-full max-w-xs rounded-lg border mx-auto" onerror="this.style.display='none'">` : ''}
-            </div>
+          <!-- BACK -->
+          <div class="card-back absolute inset-0 rounded-xl overflow-hidden"
+               style="backface-visibility: hidden; transform: rotateY(180deg);">
+            <img src="${card.answerImage || ''}"
+                 class="w-full h-full object-contain"
+                 alt="Answer image">
           </div>
 
         </div>
       </div>
 
+<!-- Question / Answer below the flashcard -->
+<div class="text-center mb-4 p-4 bg-white rounded-xl shadow">
+  <div class="text-lg font-semibold mb-2">
+    ${isBrowseCardFlipped ? 'Answer' : 'Question'}
+  </div>
+  <p class="text-text leading-relaxed mb-2">
+    ${isBrowseCardFlipped ? card.answer?.text || '' : card.question}
+  </p>
+
+  <!-- MathML only if flipped -->
+  ${isBrowseCardFlipped ? `
+    <div id="answerMath" class="text-lg leading-relaxed">
+      ${card.answer?.mathml || ''}
+    </div>
+  ` : ''}
+
+  <!-- Image credits -->
+${card.imageCredit ? `
+  <div class="mt-1 text-right text-text-muted" style="font-size: 10px;">
+    Image credit: ${card.imageCredit}
+  </div>
+` : ''}
+</div>
+
+
+      <!-- Tap hint -->
       <div class="text-center mb-4">
         <p class="text-text-muted">Tap the card to ${isBrowseCardFlipped ? 'see question' : 'reveal answer'}</p>
       </div>
 
+      <!-- Navigation -->
       <div class="flex justify-between gap-4">
         <button onclick="prevBrowseCard()"
                 class="btn-secondary flex-1 py-3 ${currentBrowseCardIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
@@ -2225,9 +1798,11 @@ function renderBrowseStudyView() {
           opacity: 1;
         }
       </style>
+
     </div>
   `;
 }
+
 
 // ---------- Flip Card ----------
 function flipBrowseCard() {
@@ -2906,201 +2481,17 @@ function zoomOut() {
   renderPage(pageNum);
 }
 
-// Enhanced Fullscreen toggle with true fullscreen mode
-let isFullscreenMode = false;
-
+// Fullscreen toggle
 function toggleFullscreen() {
   const container = document.querySelector(".pdf-viewer-container");
   if (!container) return;
 
   if (!document.fullscreenElement) {
-    // Enter fullscreen mode
     container.requestFullscreen().catch(err => console.log(err));
-    isFullscreenMode = true;
-    
-    // Hide all UI elements after a short delay
-    setTimeout(() => {
-      const pdfHeader = container.querySelector('.pdf-header');
-      const pdfToolbar = container.querySelector('#pdf-toolbar');
-      const pdfFooter = container.querySelector('.pdf-footer');
-      const pdfContent = container.querySelector('#pdf-content');
-      
-      if (pdfHeader) pdfHeader.style.display = 'none';
-      if (pdfToolbar) pdfToolbar.style.display = 'none';
-      if (pdfFooter) pdfFooter.style.display = 'none';
-      
-      // Make PDF content take full viewport
-      if (pdfContent) {
-        pdfContent.style.minHeight = '100vh';
-        pdfContent.style.maxHeight = '100vh';
-        pdfContent.style.background = '#000';
-        pdfContent.style.padding = '0';
-        pdfContent.style.margin = '0';
-        pdfContent.style.borderRadius = '0';
-        pdfContent.style.boxShadow = 'none';
-      }
-      
-      // Hide canvas container padding
-      const canvasContainer = container.querySelector('.p-2.sm\\:p-4');
-      if (canvasContainer) {
-        canvasContainer.style.padding = '0';
-      }
-      
-      // Make canvas take full screen
-      const canvas = document.getElementById('pdf-canvas');
-      if (canvas) {
-        canvas.style.maxWidth = '100vw';
-        canvas.style.maxHeight = '100vh';
-        canvas.style.borderRadius = '0';
-        canvas.style.boxShadow = 'none';
-        canvas.style.margin = '0 auto';
-        canvas.style.display = 'block';
-      }
-      
-      // Hide loading indicator if visible
-      const loading = document.getElementById('pdf-loading');
-      if (loading) loading.style.display = 'none';
-      
-      showToast('Entered fullscreen mode - Press ESC to exit');
-    }, 300);
-    
   } else {
-    // Exit fullscreen mode
     document.exitFullscreen();
-    isFullscreenMode = false;
-    
-    // Restore all UI elements
-    setTimeout(() => {
-      const pdfHeader = container.querySelector('.pdf-header');
-      const pdfToolbar = container.querySelector('#pdf-toolbar');
-      const pdfFooter = container.querySelector('.pdf-footer');
-      const pdfContent = container.querySelector('#pdf-content');
-      
-      if (pdfHeader) pdfHeader.style.display = '';
-      if (pdfToolbar) pdfToolbar.style.display = '';
-      if (pdfFooter) pdfFooter.style.display = '';
-      
-      // Restore PDF content styling
-      if (pdfContent) {
-        pdfContent.style.minHeight = '';
-        pdfContent.style.maxHeight = '';
-        pdfContent.style.background = '';
-        pdfContent.style.padding = '';
-        pdfContent.style.margin = '';
-        pdfContent.style.borderRadius = '';
-        pdfContent.style.boxShadow = '';
-      }
-      
-      // Restore canvas container padding
-      const canvasContainer = container.querySelector('.p-2.sm\\:p-4');
-      if (canvasContainer) {
-        canvasContainer.style.padding = '';
-      }
-      
-      // Restore canvas styling
-      const canvas = document.getElementById('pdf-canvas');
-      if (canvas) {
-        canvas.style.maxWidth = '';
-        canvas.style.maxHeight = '';
-        canvas.style.borderRadius = '';
-        canvas.style.boxShadow = '';
-        canvas.style.margin = '';
-        canvas.style.display = '';
-      }
-      
-      showToast('Exited fullscreen mode');
-    }, 100);
   }
 }
-
-// Add keyboard navigation support for fullscreen mode
-document.addEventListener('keydown', (e) => {
-  if (!isFullscreenMode) return;
-  
-  switch(e.key) {
-    case 'Escape':
-      // Exit fullscreen
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      }
-      break;
-    case 'ArrowLeft':
-    case 'ArrowUp':
-      e.preventDefault();
-      previousPage();
-      break;
-    case 'ArrowRight':
-    case 'ArrowDown':
-    case ' ':
-      e.preventDefault();
-      nextPage();
-      break;
-    case '+':
-    case '=':
-      e.preventDefault();
-      zoomIn();
-      break;
-    case '-':
-    case '_':
-      e.preventDefault();
-      zoomOut();
-      break;
-    case '0':
-      e.preventDefault();
-      scale = 1.0;
-      renderPage(pageNum);
-      showToast('Zoom reset to 100%');
-      break;
-  }
-});
-
-// Add fullscreen change listener to handle ESC key and browser exit
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && isFullscreenMode) {
-    // User exited fullscreen via ESC or browser controls
-    isFullscreenMode = false;
-    
-    // Restore UI elements
-    const container = document.querySelector(".pdf-viewer-container");
-    if (container) {
-      setTimeout(() => {
-        const pdfHeader = container.querySelector('.pdf-header');
-        const pdfToolbar = container.querySelector('#pdf-toolbar');
-        const pdfFooter = container.querySelector('.pdf-footer');
-        const pdfContent = container.querySelector('#pdf-content');
-        
-        if (pdfHeader) pdfHeader.style.display = '';
-        if (pdfToolbar) pdfToolbar.style.display = '';
-        if (pdfFooter) pdfFooter.style.display = '';
-        
-        if (pdfContent) {
-          pdfContent.style.minHeight = '';
-          pdfContent.style.maxHeight = '';
-          pdfContent.style.background = '';
-          pdfContent.style.padding = '';
-          pdfContent.style.margin = '';
-          pdfContent.style.borderRadius = '';
-          pdfContent.style.boxShadow = '';
-        }
-        
-        const canvasContainer = container.querySelector('.p-2.sm\\:p-4');
-        if (canvasContainer) {
-          canvasContainer.style.padding = '';
-        }
-        
-        const canvas = document.getElementById('pdf-canvas');
-        if (canvas) {
-          canvas.style.maxWidth = '';
-          canvas.style.maxHeight = '';
-          canvas.style.borderRadius = '';
-          canvas.style.boxShadow = '';
-          canvas.style.margin = '';
-          canvas.style.display = '';
-        }
-      }, 100);
-    }
-  }
-});
 
 function toggleReadingMode() {
   readingMode = !readingMode;
@@ -3352,191 +2743,91 @@ document.addEventListener("change", function (e) {
 
 function renderHomeView() {
   return `
-    <div class="mobile-optimized w-full h-full flex items-center justify-center p-6 relative overflow-hidden" style="background: radial-gradient(ellipse at top, var(--primary) 0%, transparent 50%), radial-gradient(ellipse at bottom, var(--accent) 0%, transparent 50%), linear-gradient(135deg, var(--background) 0%, var(--surface) 50%, var(--background) 100%); background-image: var(--background-image); background-size: cover; background-position: center; min-height: 100vh;">
-      
-      <!-- Enhanced animated background elements -->
-      <div class="absolute inset-0 overflow-hidden">
-        <div class="absolute top-16 left-12 text-7xl animate-bounce" style="animation-delay: 0s; color: var(--primary); opacity: 0.08;">📚</div>
-        <div class="absolute top-24 right-16 text-5xl animate-pulse" style="animation-delay: 1.5s; color: var(--secondary); opacity: 0.06;">🃏</div>
-        <div class="absolute bottom-24 left-16 text-6xl animate-bounce" style="animation-delay: 2.5s; color: var(--accent); opacity: 0.08;">🎯</div>
-        <div class="absolute bottom-16 right-12 text-4xl animate-pulse" style="animation-delay: 1s; color: var(--success); opacity: 0.06;">📖</div>
-        
-        <!-- Floating gradient orbs -->
-        <div class="absolute top-1/4 left-1/4 w-64 h-64 rounded-full animate-pulse" style="background: radial-gradient(circle, var(--primary) 0%, transparent 70%); opacity: 0.05; animation-duration: 4s;"></div>
-        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full animate-pulse" style="background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.03; animation-duration: 6s; animation-delay: 2s;"></div>
+    <div class="mobile-optimized w-full h-full flex items-center justify-center p-4 relative overflow-hidden" style="background: linear-gradient(135deg, var(--background) 0%, var(--surface) 50%, var(--background) 100%); background-image: var(--background-image); background-size: cover; background-position: center;">
+      <!-- Animated background elements -->
+      <div class="absolute inset-0 opacity-5">
+        <div class="absolute top-10 left-10 text-6xl animate-bounce" style="animation-delay: 0s; color: var(--primary);">📚</div>
+        <div class="absolute top-20 right-20 text-4xl animate-pulse" style="animation-delay: 1s; color: var(--secondary);">🃏</div>
+        <div class="absolute bottom-20 left-20 text-5xl animate-bounce" style="animation-delay: 2s; color: var(--accent);">🎯</div>
+        <div class="absolute bottom-10 right-10 text-3xl animate-pulse" style="animation-delay: 0.5s; color: var(--success);">📖</div>
       </div>
 
-      <!-- Main content card with enhanced glassmorphism -->
-      <div class="max-w-lg w-full text-center fade-in relative z-10" style="animation-duration: 0.8s;">
-        <div class="relative p-10 rounded-3xl" style="
-          background: rgba(255, 255, 255, 0.95); 
-          backdrop-filter: blur(24px) saturate(180%); 
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          box-shadow: 
-            0 32px 64px rgba(0, 0, 0, 0.12),
-            0 16px 32px rgba(0, 0, 0, 0.08),
-            inset 0 1px 0 rgba(255, 255, 255, 0.4);
-        ">
-          
-          <!-- Subtle inner glow -->
-          <div class="absolute inset-0 rounded-3xl opacity-60" style="
-            background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%);
-            pointer-events: none;
-          "></div>
+      <div class="max-w-md w-full text-center fade-in card p-8 relative z-10" style="box-shadow: var(--shadow-xl); background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border);">
 
-          <div class="relative z-10">
-            <!-- Enhanced header section -->
-            <div class="mb-10">
-              <div class="inline-flex items-center justify-center w-24 h-24 rounded-2xl mb-6 relative shadow-xl" style="
-                background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); 
-                box-shadow: 
-                  0 12px 24px rgba(37, 99, 235, 0.25),
-                  0 4px 8px rgba(0, 0, 0, 0.1);
-                transform: translateY(-2px);
-                transition: all 0.3s ease;
-              ">
-                <div class="absolute inset-0 rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-300" style="
-                  background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%);
-                "></div>
-                <span class="text-4xl relative z-10" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));">🎓</span>
-              </div>
-              
-              <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-[var(--primary)] via-[var(--accent)] to-[var(--primary)] bg-clip-text text-transparent" style="
-                font-family: var(--font-family-heading); 
-                font-weight: var(--font-weight-bold);
-                letter-spacing: -0.02em;
-                line-height: 1.2;
-              ">
-                Study Hub
-              </h1>
-              <p class="text-xl leading-relaxed" style="
-                color: var(--text-muted); 
-                font-family: var(--font-family);
-                font-weight: var(--font-weight-normal);
-                letter-spacing: 0.01em;
-              ">
-                Master your subjects with interactive flashcards and quizzes
-              </p>
+        <div class="mb-8">
+          <div class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 shadow-lg" style="background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); box-shadow: var(--shadow-lg);">
+            <span class="text-3xl">🎓</span>
+          </div>
+          <h1 class="text-3xl font-bold mb-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] bg-clip-text text-transparent" style="font-family: var(--font-family-heading); font-weight: var(--font-weight-bold);">
+            Study Hub
+          </h1>
+          <p class="text-lg leading-relaxed" style="color: var(--text-muted); font-family: var(--font-family);">
+            Master your subjects with interactive flashcards and quizzes
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-4">
+
+          <!-- Flashcards -->
+          <button
+            type="button"
+            onclick="openFlashcards()"
+            class="btn-primary w-full py-6 text-lg font-semibold quiz-option group relative overflow-hidden"
+            style="box-shadow: var(--shadow-lg); min-height: 64px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); font-family: var(--font-family); font-weight: var(--font-weight-semibold);"
+          >
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300" style="background: var(--text);"></div>
+            <div class="flex items-center justify-center gap-3 relative z-10">
+              <span class="text-2xl">🃏</span>
+              <span style="color: var(--text);">Flashcards</span>
             </div>
+          </button>
 
-            <!-- Enhanced button grid -->
-            <div class="flex flex-col gap-4 mb-8">
-              
-              <!-- Flashcards button with enhanced design -->
-              <button
-                type="button"
-                onclick="openFlashcards()"
-                class="group relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                style="
-                  min-height: 72px; 
-                  border-radius: var(--radius-lg);
-                  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-                  box-shadow: 
-                    0 8px 16px rgba(37, 99, 235, 0.2),
-                    0 4px 8px rgba(0, 0, 0, 0.1);
-                  font-family: var(--font-family); 
-                  font-weight: var(--font-weight-semibold);
-                "
-              >
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-20 transition-all duration-300" style="
-                  background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
-                "></div>
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style="
-                  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15) 0%, transparent 70%);
-                "></div>
-                <div class="flex items-center justify-center gap-4 relative z-10 px-8 py-5">
-                  <span class="text-3xl transform group-hover:scale-110 transition-transform duration-300" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🃏</span>
-                  <span class="text-xl" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Flashcards</span>
-                </div>
-              </button>
-
-              <!-- Teacher Quiz button -->
-              <button
-                onclick="openTeacherQuiz()"
-                class="group relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                style="
-                  min-height: 72px; 
-                  border-radius: var(--radius-lg);
-                  background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-dark) 100%);
-                  box-shadow: 
-                    0 8px 16px rgba(100, 116, 139, 0.2),
-                    0 4px 8px rgba(0, 0, 0, 0.1);
-                  font-family: var(--font-family); 
-                  font-weight: var(--font-weight-semibold);
-                "
-              >
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-20 transition-all duration-300" style="
-                  background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
-                "></div>
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style="
-                  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15) 0%, transparent 70%);
-                "></div>
-                <div class="flex items-center justify-center gap-4 relative z-10 px-8 py-5">
-                  <span class="text-3xl transform group-hover:scale-110 transition-transform duration-300" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">👩‍🏫</span>
-                  <span class="text-xl" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Create Quiz</span>
-                </div>
-              </button>
-
-              <!-- Student Quiz button -->
-              <button
-                onclick="openStudentQuiz()"
-                class="group relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                style="
-                  min-height: 72px; 
-                  border-radius: var(--radius-lg);
-                  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-                  box-shadow: 
-                    0 8px 16px rgba(245, 158, 11, 0.2),
-                    0 4px 8px rgba(0, 0, 0, 0.1);
-                  font-family: var(--font-family); 
-                  font-weight: var(--font-weight-semibold);
-                "
-              >
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-20 transition-all duration-300" style="
-                  background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
-                "></div>
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style="
-                  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.15) 0%, transparent 70%);
-                "></div>
-                <div class="flex items-center justify-center gap-4 relative z-10 px-8 py-5">
-                  <span class="text-3xl transform group-hover:scale-110 transition-transform duration-300" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">👨‍🎓</span>
-                  <span class="text-xl" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Join Quiz</span>
-                </div>
-              </button>
-
+          <!-- Teacher Quiz -->
+          <button
+            onclick="openTeacherQuiz()"
+            class="btn-secondary w-full py-6 text-lg font-semibold quiz-option group relative overflow-hidden"
+            style="min-height: 64px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-dark) 100%); box-shadow: var(--shadow); font-family: var(--font-family); font-weight: var(--font-weight-semibold);"
+          >
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300" style="background: var(--text);"></div>
+            <div class="flex items-center justify-center gap-3 relative z-10">
+              <span class="text-2xl">👩‍🏫</span>
+              <span style="color: var(--text);">Create Quiz</span>
             </div>
+          </button>
 
-            <!-- Enhanced quick stats section -->
-            <div class="pt-8" style="border-top: 1px solid rgba(0, 0, 0, 0.08);">
-              <div class="grid grid-cols-3 gap-6 text-center">
-                <div class="group">
-                  <div class="text-3xl font-bold mb-1 transform group-hover:scale-110 transition-transform duration-300" style="
-                    color: var(--primary); 
-                    font-weight: var(--font-weight-bold);
-                    text-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
-                  ">${getTotalSubjects()}</div>
-                  <div class="text-sm font-medium" style="color: var(--text-muted);">Subjects</div>
-                </div>
-                <div class="group">
-                  <div class="text-3xl font-bold mb-1 transform group-hover:scale-110 transition-transform duration-300" style="
-                    color: var(--success); 
-                    font-weight: var(--font-weight-bold);
-                    text-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
-                  ">${getTotalCards()}</div>
-                  <div class="text-sm font-medium" style="color: var(--text-muted);">Cards</div>
-                </div>
-                <div class="group">
-                  <div class="text-3xl font-bold mb-1 transform group-hover:scale-110 transition-transform duration-300" style="
-                    color: var(--accent); 
-                    font-weight: var(--font-weight-bold);
-                    text-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
-                  ">${getTotalQuizzes()}</div>
-                  <div class="text-sm font-medium" style="color: var(--text-muted);">Quizzes</div>
-                </div>
-              </div>
+          <!-- Student Quiz -->
+          <button
+            onclick="openStudentQuiz()"
+            class="btn-secondary w-full py-6 text-lg font-semibold quiz-option group relative overflow-hidden"
+            style="min-height: 64px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); box-shadow: var(--shadow); font-family: var(--font-family); font-weight: var(--font-weight-semibold);"
+          >
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300" style="background: var(--text);"></div>
+            <div class="flex items-center justify-center gap-3 relative z-10">
+              <span class="text-2xl">👨‍🎓</span>
+              <span style="color: var(--text);">Join Quiz</span>
+            </div>
+          </button>
+
+        </div>
+
+        <!-- Quick stats -->
+        <div class="mt-8 pt-6" style="border-top: 1px solid var(--border);">
+          <div class="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div class="text-2xl font-bold" style="color: var(--primary); font-weight: var(--font-weight-bold);">${getTotalSubjects()}</div>
+              <div class="text-xs" style="color: var(--text-muted);">Subjects</div>
+            </div>
+            <div>
+              <div class="text-2xl font-bold" style="color: var(--success); font-weight: var(--font-weight-bold);">${getTotalCards()}</div>
+              <div class="text-xs" style="color: var(--text-muted);">Cards</div>
+            </div>
+            <div>
+              <div class="text-2xl font-bold" style="color: var(--accent); font-weight: var(--font-weight-bold);">${getTotalQuizzes()}</div>
+              <div class="text-xs" style="color: var(--text-muted);">Quizzes</div>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   `;
@@ -3559,6 +2850,367 @@ function openStudentQuiz() {
   renderApp();
 }
 
+// ============= PROFILE & CLASS HELPER FUNCTIONS =============
+
+function handleProfilePictureUpload(file) {
+  if (!file) return;
+  
+  if (file.size > 5 * 1024 * 1024) {
+    toast('File size must be less than 5MB');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const pictureUrl = e.target.result;
+    const profile = getStudentProfile();
+    profile.profilePictureUrl = pictureUrl;
+    saveStudentProfile(profile);
+    renderApp();
+    toast('✅ Profile picture uploaded');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeProfilePicture() {
+  const profile = getStudentProfile();
+  profile.profilePictureUrl = null;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('Profile picture removed');
+}
+
+function connectGoogle() {
+  const email = prompt('Enter your Google email:');
+  if (!email) return;
+  
+  const profile = getStudentProfile();
+  profile.googleId = `google_${Date.now()}`;
+  profile.googleEmail = email;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('✅ Google account connected');
+}
+
+function disconnectGoogle() {
+  if (!confirm('Are you sure you want to disconnect your Google account?')) return;
+  
+  const profile = getStudentProfile();
+  profile.googleId = null;
+  profile.googleEmail = null;
+  saveStudentProfile(profile);
+  renderApp();
+  toast('Google account disconnected');
+}
+
+function saveEnhancedProfile() {
+  const name = document.getElementById('profile-name')?.value?.trim();
+  const studentId = document.getElementById('profile-student-id')?.value?.trim();
+  const email = document.getElementById('profile-email')?.value?.trim();
+  const school = document.getElementById('profile-school')?.value?.trim();
+  const grade = document.getElementById('profile-grade')?.value?.trim();
+  
+  if (!name || !studentId) {
+    toast('❌ Name and Student ID are required');
+    return;
+  }
+  
+  const profile = getStudentProfile();
+  profile.name = name;
+  profile.id = studentId;
+  profile.email = email;
+  profile.school = school;
+  profile.grade = grade;
+  
+  saveStudentProfile(profile);
+  window.currentStudent = profile;
+  localStorage.setItem('currentStudent', JSON.stringify(profile));
+  
+  renderApp();
+  toast('✅ Profile saved successfully');
+}
+
+function enrollInClass() {
+  const classCode = document.getElementById('class-code-input')?.value?.trim()?.toUpperCase();
+  
+  if (!classCode) {
+    toast('❌ Please enter a class code');
+    return;
+  }
+  
+  const result = enrollStudentInClass(classCode);
+  
+  if (result.success) {
+    document.getElementById('class-code-input').value = '';
+    renderApp();
+    toast('✅ Successfully enrolled in class!');
+  } else {
+    toast('❌ ' + result.error);
+  }
+}
+
+function unenrollFromClass(classId) {
+  if (!confirm('Are you sure you want to unenroll from this class?')) return;
+  
+  const enrolledClasses = getStudentEnrolledClasses();
+  const filtered = enrolledClasses.filter(e => e.classId !== classId);
+  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(filtered));
+  
+  renderApp();
+  toast('Unenrolled from class');
+}
+
+function startClassQuiz(quizId) {
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const quiz = classQuizzes.find(q => q.id === quizId);
+  
+  if (!quiz) {
+    toast('Quiz not found');
+    return;
+  }
+  
+  // Check attempt limit
+  const studentId = window.currentStudent?.id;
+  const classId = quiz.classId;
+  const attemptLimit = getQuizAttemptLimit(classId, quizId);
+  const attempts = getStudentQuizAttempts(studentId, quizId);
+  
+  if (attempts.length >= attemptLimit) {
+    toast(`❌ You have reached the maximum of ${attemptLimit} attempt(s) for this quiz`);
+    return;
+  }
+  
+  if (quiz.timeLimit) {
+    window._quizTimeLimit = quiz.timeLimit * 60;
+  }
+  
+  window._classQuizId = quizId;
+  window._classQuiz = quiz;
+  currentView = 'class-quiz';
+  renderApp();
+}
+
+function createNewClass() {
+  const name = document.getElementById('new-class-name')?.value?.trim();
+  const subject = document.getElementById('new-class-subject')?.value?.trim();
+  const grade = document.getElementById('new-class-grade')?.value?.trim();
+  const description = document.getElementById('new-class-description')?.value?.trim();
+  
+  if (!name) {
+    toast('❌ Class name is required');
+    return;
+  }
+  
+  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
+  const classId = 'class_' + Date.now();
+  const classCode = generateClassCode();
+  
+  const newClass = {
+    id: classId,
+    name: name,
+    subject: subject || '',
+    grade: grade || '',
+    description: description || '',
+    classCode: classCode,
+    teacherId: teacherId,
+    createdAt: new Date().toISOString()
+  };
+  
+  saveClass(newClass);
+  
+  document.getElementById('new-class-name').value = '';
+  document.getElementById('new-class-subject').value = '';
+  document.getElementById('new-class-grade').value = '';
+  document.getElementById('new-class-description').value = '';
+  
+  renderApp();
+  toast('✅ Class created successfully!');
+}
+
+function generateClassCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
+  if (allClasses.some(c => c.classCode === code)) {
+    return generateClassCode();
+  }
+  
+  return code;
+}
+
+function deleteTeacherClass(classId) {
+  if (!confirm('Are you sure you want to delete this class? This action cannot be undone.')) return;
+  
+  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
+  const classes = getTeacherClasses(teacherId);
+  const filtered = classes.filter(c => c.id !== classId);
+  
+  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
+  
+  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const filteredQuizzes = allQuizzes.filter(q => q.classId !== classId);
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filteredQuizzes));
+  
+  renderApp();
+  toast('Class and associated quizzes deleted');
+}
+
+function openAddQuizToClassModal(classId) {
+  // Get all quizzes from localStorage
+  const quizzes = [];
+  
+  // Search through all localStorage keys for teacher quizzes
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(stored)) {
+          quizzes.push(...stored);
+        }
+      } catch (e) {
+        console.error('Error parsing quiz key:', key, e);
+      }
+    }
+  }
+  
+  if (quizzes.length === 0) {
+    toast('❌ You need to create quizzes first in the Dashboard');
+    return;
+  }
+  
+  let html = '<div style="background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px;">';
+  html += '<h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Add Quiz to Class</h3>';
+  html += '<p style="font-size: 14px; margin-bottom: 15px; color: var(--on-surface-variant);">Select a quiz to add to this class:</p>';
+  html += '<div style="max-height: 400px; overflow-y: auto; space-y: 2;">';
+  
+  quizzes.forEach(quiz => {
+    html += `
+      <div style="background: var(--input-bg); padding: 10px; border-radius: 6px; margin-bottom: 10px; cursor: pointer;"
+           onclick="assignQuizToClass('${classId}', '${quiz.quizId || quiz.id}'); toast('✅ Quiz added to class')">
+        <p style="font-weight: bold;">${quiz.title || quiz.quizName || 'Untitled Quiz'}</p>
+        <p style="font-size: 12px; color: var(--on-surface-variant);">${quiz.questions?.length || 0} questions</p>
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  html += `<button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
+           onclick="document.querySelector('[data-modal-overlay]').remove(); teacherTab='classes'; renderApp()">Close</button>`;
+  html += '</div>';
+  
+  const overlay = document.createElement('div');
+  overlay.setAttribute('data-modal-overlay', 'true');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;';
+  overlay.innerHTML = `<div style="width: 90%; max-width: 500px;">${html}</div>`;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
+  document.body.appendChild(overlay);
+}
+
+function assignQuizToClass(classId, quizId) {
+  // Find quiz from all storage locations
+  let quiz = null;
+  
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(stored)) {
+          quiz = stored.find(q => q.quizId === quizId || q.id === quizId);
+          if (quiz) break;
+        }
+      } catch (e) {
+        console.error('Error parsing quiz key:', key, e);
+      }
+    }
+  }
+  
+  if (!quiz) {
+    toast('Quiz not found');
+    return;
+  }
+  
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  
+  if (classQuizzes.some(cq => cq.classId === classId && cq.id === quizId)) {
+    toast('This quiz is already in the class');
+    return;
+  }
+  
+  // If quiz doesn't have questions locally, try to fetch from Cloudflare
+  let questions = quiz.questions || [];
+  
+  if (!questions || questions.length === 0) {
+    // Try to fetch from Cloudflare (async, but we'll save what we have)
+    toast('⏳ Fetching quiz details...');
+    
+    // Fetch from Cloudflare in background
+    (async () => {
+      try {
+        const cfData = await getQuizFromCloudflare(quizId);
+        if (cfData && cfData.questions) {
+          questions = cfData.questions;
+          
+          // Update the stored quiz with questions
+          const key = `teacher_quizzes_${getUser().id}`;
+          const stored = JSON.parse(localStorage.getItem(key) || '[]');
+          const idx = stored.findIndex(q => q.quizId === quizId);
+          if (idx >= 0) {
+            stored[idx].questions = questions;
+            localStorage.setItem(key, JSON.stringify(stored));
+          }
+          
+          // Update class quiz with questions
+          const classQuizzes2 = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+          const cqIdx = classQuizzes2.findIndex(cq => cq.classId === classId && cq.id === quizId);
+          if (cqIdx >= 0) {
+            classQuizzes2[cqIdx].questions = questions;
+            localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes2));
+          }
+          
+          toast('✅ Quiz added with ' + questions.length + ' questions!');
+          renderApp();
+        }
+      } catch (err) {
+        console.log('Could not fetch from Cloudflare, using local data');
+      }
+    })();
+  }
+  
+  const classQuiz = {
+    id: quizId,
+    classId: classId,
+    title: quiz.quizName || quiz.title || 'Untitled Quiz',
+    questions: questions,
+    timeLimit: null,
+    createdAt: new Date().toISOString()
+  };
+  
+  classQuizzes.push(classQuiz);
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes));
+  
+  teacherTab = 'classes';
+  renderApp();
+}
+
+function removeQuizFromClass(classId, quizId) {
+  if (!confirm('Remove this quiz from the class?')) return;
+  
+  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
+  const filtered = classQuizzes.filter(q => !(q.classId === classId && q.id === quizId));
+  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filtered));
+  
+  renderApp();
+  toast('Quiz removed from class');
+}
+
 function renderStudentView() {
   return `
     <div class="flex flex-col items-center mt-6 space-y-6 w-full">
@@ -3573,7 +3225,7 @@ function renderStudentView() {
 </div>
 
       <!-- Student Tabs -->
-      <div class="flex gap-2 flex-wrap">
+      <div class="flex gap-2">
         <button
           class="px-4 py-2 rounded-lg transition-colors duration-200"
           style="
@@ -3593,25 +3245,13 @@ function renderStudentView() {
         >
           Profile
         </button>
-
-        <button
-          class="px-4 py-2 rounded-lg transition-colors duration-200"
-          style="
-            background-color: ${studentTab === 'classes' ? 'var(--primary)' : 'var(--surface)'}; 
-            color: ${studentTab === 'classes' ? 'var(--on-primary)' : 'var(--on-surface)'};"
-          onclick="studentTab='classes'; renderApp()"
-        >
-          Classes
-        </button>
       </div>
 
       <!-- Content -->
       <div class="w-full max-w-xl">
         ${studentTab === 'main'
           ? renderJoinQuiz()
-          : studentTab === 'profile'
-          ? renderEnhancedStudentProfile()
-          : renderStudentClassesView()}
+          : renderStudentProfile()}
       </div>
 
     </div>
@@ -3849,408 +3489,6 @@ function backStudentBtn() {
   renderApp();         
 }
 
-// ============= ENHANCED STUDENT PROFILE WITH GOOGLE AUTH & PICTURE =============
-
-function renderEnhancedStudentProfile() {
-  const profile = getStudentProfile();
-
-  return `
-    <div class="p-6 rounded-xl shadow space-y-6 mx-auto"
-         style="background-color: var(--surface); color: var(--on-surface);">
-      <h2 class="text-2xl font-bold text-center">My Profile</h2>
-
-      <!-- Profile Picture Section -->
-      <div class="flex flex-col items-center space-y-4">
-        <div class="w-24 h-24 rounded-full overflow-hidden border-4" 
-             style="border-color: var(--primary); background-color: var(--input-bg);">
-          ${profile.profilePictureUrl 
-            ? `<img src="${profile.profilePictureUrl}" class="w-full h-full object-cover" alt="Profile">`
-            : `<div class="w-full h-full flex items-center justify-center text-3xl">👤</div>`}
-        </div>
-        
-        <div class="flex gap-2">
-          <button class="px-4 py-2 rounded transition-colors duration-200 text-sm"
-                  style="background-color: var(--primary); color: var(--on-primary);"
-                  onclick="document.getElementById('profile-pic-input').click()">
-            Upload Picture
-          </button>
-          ${profile.profilePictureUrl ? `
-          <button class="px-4 py-2 rounded transition-colors duration-200 text-sm"
-                  style="background-color: var(--error); color: var(--on-error);"
-                  onclick="removeProfilePicture()">
-            Remove
-          </button>` : ''}
-        </div>
-        
-        <input type="file" id="profile-pic-input" class="hidden" accept="image/*"
-               onchange="handleProfilePictureUpload(this.files[0])">
-      </div>
-
-      <!-- Basic Info -->
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-semibold mb-1">Full Name</label>
-          <input id="profile-name"
-                 class="w-full p-2 border rounded"
-                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
-                 value="${profile.name || ''}" placeholder="Enter your name">
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold mb-1">Student ID</label>
-          <input id="profile-student-id"
-                 class="w-full p-2 border rounded"
-                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
-                 value="${profile.id || ''}" placeholder="Enter your student ID">
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold mb-1">Email</label>
-          <input id="profile-email" type="email"
-                 class="w-full p-2 border rounded"
-                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
-                 value="${profile.email || ''}" placeholder="your.email@example.com">
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold mb-1">School/Institution</label>
-          <input id="profile-school"
-                 class="w-full p-2 border rounded"
-                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
-                 value="${profile.school || ''}" placeholder="Your school or institution">
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold mb-1">Grade/Level</label>
-          <input id="profile-grade"
-                 class="w-full p-2 border rounded"
-                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
-                 value="${profile.grade || ''}" placeholder="e.g., 10th Grade, University">
-        </div>
-      </div>
-
-      <!-- Google Account Integration -->
-      <div class="border-t pt-4" style="border-color: var(--border);">
-        <h3 class="font-semibold mb-3">Connected Accounts</h3>
-        
-        ${profile.googleId 
-          ? `<div class="flex items-center justify-between p-3 rounded"
-                  style="background-color: var(--input-bg);">
-              <div class="flex items-center gap-2">
-                <span>🔗 Google Account</span>
-                <span class="text-sm">${profile.googleEmail || 'Connected'}</span>
-              </div>
-              <button class="text-sm px-2 py-1 rounded transition-colors"
-                      style="background-color: var(--error); color: var(--on-error);"
-                      onclick="disconnectGoogle()">
-                Disconnect
-              </button>
-            </div>`
-          : `<button class="w-full px-4 py-2 rounded transition-colors flex items-center justify-center gap-2"
-                   style="background-color: #4285F4; color: white;"
-                   onclick="connectGoogle()">
-              <span>🔗</span> Connect Google Account
-            </button>`}
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="flex gap-3 pt-4">
-        <button class="flex-1 px-4 py-2 rounded transition-colors duration-200 font-semibold"
-                style="background-color: var(--primary); color: var(--on-primary);"
-                onclick="saveEnhancedProfile()">
-          Save Profile
-        </button>
-
-        <button class="flex-1 px-4 py-2 rounded transition-colors duration-200"
-                style="background-color: var(--surface-variant); color: var(--on-surface);"
-                onclick="studentTab='main'; renderApp()">
-          Cancel
-        </button>
-      </div>
-    </div>
-  `;
-}
-
-function handleProfilePictureUpload(file) {
-  if (!file) return;
-  
-  // Check file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    toast('File size must be less than 5MB');
-    return;
-  }
-  
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const pictureUrl = e.target.result;
-    const profile = getStudentProfile();
-    profile.profilePictureUrl = pictureUrl;
-    saveStudentProfile(profile);
-    renderApp();
-    toast('✅ Profile picture uploaded');
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeProfilePicture() {
-  const profile = getStudentProfile();
-  profile.profilePictureUrl = null;
-  saveStudentProfile(profile);
-  renderApp();
-  toast('Profile picture removed');
-}
-
-function connectGoogle() {
-  // Note: For production, implement proper OAuth2 flow with Google
-  // For now, show a demo setup
-  const email = prompt('Enter your Google email:');
-  if (!email) return;
-  
-  const profile = getStudentProfile();
-  profile.googleId = `google_${Date.now()}`;
-  profile.googleEmail = email;
-  saveStudentProfile(profile);
-  renderApp();
-  toast('✅ Google account connected');
-}
-
-function disconnectGoogle() {
-  if (!confirm('Are you sure you want to disconnect your Google account?')) return;
-  
-  const profile = getStudentProfile();
-  profile.googleId = null;
-  profile.googleEmail = null;
-  saveStudentProfile(profile);
-  renderApp();
-  toast('Google account disconnected');
-}
-
-function saveEnhancedProfile() {
-  const name = document.getElementById('profile-name').value.trim();
-  const studentId = document.getElementById('profile-student-id').value.trim();
-  const email = document.getElementById('profile-email').value.trim();
-  const school = document.getElementById('profile-school').value.trim();
-  const grade = document.getElementById('profile-grade').value.trim();
-  
-  if (!name || !studentId) {
-    toast('❌ Name and Student ID are required');
-    return;
-  }
-  
-  const profile = getStudentProfile();
-  profile.name = name;
-  profile.id = studentId;
-  profile.email = email;
-  profile.school = school;
-  profile.grade = grade;
-  
-  saveStudentProfile(profile);
-  window.currentStudent = profile;
-  localStorage.setItem('currentStudent', JSON.stringify(profile));
-  
-  renderApp();
-  toast('✅ Profile saved successfully');
-}
-
-// ============= STUDENT CLASSES VIEW =============
-
-function renderStudentClassesView() {
-  const studentId = window.currentStudent?.id;
-  if (!studentId) {
-    return `<div class="p-6 text-center" style="color: var(--on-surface);">
-      Please create an account first to enroll in classes.
-    </div>`;
-  }
-  
-  const enrolledClasses = getStudentEnrolledClasses(studentId);
-
-  return `
-    <div class="space-y-6">
-      <!-- Enroll Section -->
-      <div class="p-6 rounded-xl shadow space-y-4"
-           style="background-color: var(--surface); color: var(--on-surface);">
-        <h3 class="text-lg font-bold">Enroll in a Class</h3>
-        
-        <div class="flex gap-2">
-          <input id="class-code-input" type="text"
-                 placeholder="Enter class code"
-                 class="flex-1 p-2 border rounded"
-                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
-                 onkeypress="if(event.key === 'Enter') enrollInClass()">
-          <button class="px-4 py-2 rounded transition-colors"
-                  style="background-color: var(--primary); color: var(--on-primary);"
-                  onclick="enrollInClass()">
-            Enroll
-          </button>
-        </div>
-        <p class="text-xs" style="color: var(--on-surface-variant);">
-          Ask your teacher for the class code
-        </p>
-      </div>
-
-      <!-- Enrolled Classes -->
-      <div class="space-y-3">
-        <h3 class="text-lg font-bold" style="color: var(--on-surface);">My Classes</h3>
-        
-        ${enrolledClasses.length === 0
-          ? `<div class="p-6 text-center rounded-xl"
-                 style="background-color: var(--surface-variant); color: var(--on-surface-variant);">
-              You haven't enrolled in any classes yet.
-            </div>`
-          : enrolledClasses.map(enrollment => {
-              const classQuizzes = getClassQuizzes(enrollment.classId);
-              return `
-              <div class="p-6 rounded-xl shadow space-y-4"
-                   style="background-color: var(--surface); color: var(--on-surface);">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h4 class="text-xl font-bold cursor-pointer hover:text-blue-600 transition-colors" 
-                        onclick="updateClassAccess('${enrollment.classId}'); openClassQuiz('${enrollment.classId}', '${enrollment.className}')">
-                      ${enrollment.className}
-                    </h4>
-                    <p class="text-sm" style="color: var(--on-surface-variant);">
-                      Enrolled: ${new Date(enrollment.enrolledAt).toLocaleDateString()}
-                      ${enrollment.lastAccessed ? `| Last accessed: ${new Date(enrollment.lastAccessed).toLocaleDateString()}` : ''}
-                    </p>
-                  </div>
-                  <button class="px-3 py-1 text-sm rounded transition-colors"
-                          style="background-color: var(--error); color: var(--on-error);"
-                          onclick="unenrollFromClass('${enrollment.classId}')">
-                    Unenroll
-                  </button>
-                </div>
-                
-                <!-- Quizzes in Class -->
-                <div class="mt-4 pt-4 border-t" style="border-color: var(--border);">
-                  <p class="text-sm font-semibold mb-3">📋 Class Quizzes (${classQuizzes.length})</p>
-                  ${classQuizzes.length === 0
-                    ? `<p class="text-xs" style="color: var(--on-surface-variant);">No quizzes yet</p>`
-                    : classQuizzes.map(quiz => {
-                      const attempts = getStudentQuizAttempts(studentId, quiz.id);
-                      const attemptLimit = getQuizAttemptLimit(enrollment.classId, quiz.id);
-                      const bestScore = attempts.length > 0 ? Math.max(...attempts.map(a => a.percentage)) : null;
-                      const bestGrade = bestScore !== null ? getLetterGrade(bestScore) : null;
-                      const canRetake = attempts.length < attemptLimit;
-                      
-                      return `
-                      <div class="mb-3 p-3 rounded"
-                           style="background-color: var(--input-bg); border-left: 4px solid ${bestGrade ? getGradeColor(bestGrade) : 'var(--border)'};">
-                        <div class="flex justify-between items-start">
-                          <div class="flex-1">
-                            <p class="font-semibold">${quiz.title}</p>
-                            <p class="text-xs" style="color: var(--on-surface-variant);">
-                              Questions: ${quiz.questions?.length || 0}
-                              ${quiz.timeLimit ? ` | Time: ${quiz.timeLimit} min` : ''}
-                            </p>
-                            <div style="margin-top: 8px; display: flex; gap: 8px; font-size: 12px;">
-                              <span style="background: var(--surface); padding: 2px 6px; border-radius: 3px;">
-                                Attempts: ${attempts.length}/${attemptLimit}
-                              </span>
-                              ${bestScore !== null ? `
-                                <span style="background: ${getGradeColor(bestGrade)}; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">
-                                  Grade: ${bestGrade} (${bestScore}%)
-                                </span>
-                              ` : ''}
-                            </div>
-                            ${quiz.dueDate ? `
-                              <p class="text-xs mt-1" style="color: ${new Date(quiz.dueDate) < new Date() ? 'var(--error)' : 'var(--primary)'};">
-                                Due: ${new Date(quiz.dueDate).toLocaleDateString()}
-                              </p>
-                            ` : ''}
-                          </div>
-                          <button class="px-3 py-1 text-sm rounded transition-colors"
-                                  style="background-color: ${canRetake ? 'var(--primary)' : 'var(--surface-variant)'}; color: var(--on-primary); cursor: ${canRetake ? 'pointer' : 'not-allowed'}; opacity: ${canRetake ? '1' : '0.5'};"
-                                  onclick="${canRetake ? `startClassQuiz('${quiz.id}')` : 'toast("❌ Maximum attempts reached")'}"
-                                  ${canRetake ? '' : 'disabled'}>
-                            ${attempts.length === 0 ? 'Start' : 'Retake'}
-                          </button>
-                        </div>
-                      </div>
-                    `;
-                    }).join('')}
-                </div>
-              </div>`;
-            }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function enrollInClass() {
-  const classCode = document.getElementById('class-code-input').value.trim().toUpperCase();
-  
-  if (!classCode) {
-    toast('❌ Please enter a class code');
-    return;
-  }
-  
-  // Get current student info or create flexible student info
-  const studentInfo = window.currentStudent || {
-    id: localStorage.getItem('currentStudentId') || localStorage.getItem('deviceId'),
-    name: window.currentStudent?.name || `Student ${(localStorage.getItem('deviceId') || '').slice(-6) || 'User'}`
-  };
-  
-  // Enhanced enrollment with cross-device support
-  const result = enrollStudentInClass(classCode, studentInfo);
-  
-  if (result.success) {
-    document.getElementById('class-code-input').value = '';
-    
-    // Update current student info
-    if (studentInfo) {
-      window.currentStudent = studentInfo;
-      localStorage.setItem('currentStudentId', studentInfo.id);
-    }
-    
-    renderApp();
-    toast('✅ Successfully enrolled in class! You can now access this class from any device.');
-  } else {
-    toast('❌ ' + result.error);
-  }
-}
-
-function unenrollFromClass(classId) {
-  if (!confirm('Are you sure you want to unenroll from this class?')) return;
-  
-  const enrolledClasses = getStudentEnrolledClasses();
-  const filtered = enrolledClasses.filter(e => e.classId !== classId);
-  localStorage.setItem(STUDENT_CLASSES_KEY, JSON.stringify(filtered));
-  
-  renderApp();
-  toast('Unenrolled from class');
-}
-
-function startClassQuiz(quizId) {
-  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
-  const quiz = classQuizzes.find(q => q.id === quizId);
-  
-  if (!quiz) {
-    toast('Quiz not found');
-    return;
-  }
-  
-  // Check attempt limit
-  const studentId = window.currentStudent?.id;
-  const classId = quiz.classId;
-  const attemptLimit = getQuizAttemptLimit(classId, quizId);
-  const attempts = getStudentQuizAttempts(studentId, quizId);
-  
-  if (attempts.length >= attemptLimit) {
-    toast(`❌ You have reached the maximum of ${attemptLimit} attempt(s) for this quiz`);
-    return;
-  }
-  
-  // Check if quiz has time limit
-  if (quiz.timeLimit) {
-    window._quizTimeLimit = quiz.timeLimit * 60; // Convert to seconds
-  }
-  
-  window._classQuizId = quizId;
-  window._classQuiz = quiz;
-  currentView = 'class-quiz';
-  renderApp();
-}
-
 function renderTeacherView() {
   return `
    <div class="flex flex-col items-center mt-6 space-y-4 w-full" 
@@ -4265,7 +3503,7 @@ function renderTeacherView() {
     </button>
   </div>
       <!-- Teacher Tabs -->
-      <div class="flex gap-2 flex-wrap">
+      <div class="flex gap-2">
         <button
           class="px-4 py-2 rounded-lg transition-colors duration-200"
           style="
@@ -4274,16 +3512,6 @@ function renderTeacherView() {
           onclick="teacherTab='main'; renderApp()"
         >
           Dashboard
-        </button>
-
-        <button
-          class="px-4 py-2 rounded-lg transition-colors duration-200"
-          style="
-            background-color: ${teacherTab === 'classes' ? 'var(--primary)' : 'var(--surface)'}; 
-            color: ${teacherTab === 'classes' ? 'var(--on-primary)' : 'var(--on-surface)'};"
-          onclick="teacherTab='classes'; renderApp()"
-        >
-          Classes
         </button>
 
         <button
@@ -4301,813 +3529,11 @@ function renderTeacherView() {
       <div class="mt-4">
         ${teacherTab === 'main'
           ? renderTeacherQuizList()
-          : teacherTab === 'classes'
-          ? renderTeacherClassesView()
           : renderTeacherProfile()}
       </div>
 
     </div>
   `;
-}
-
-function getLetterGrade(percentage) {
-  if (percentage >= 90) return 'A';
-  if (percentage >= 80) return 'B';
-  if (percentage >= 70) return 'C';
-  if (percentage >= 60) return 'D';
-  return 'F';
-}
-
-function getGradeColor(grade) {
-  switch(grade) {
-    case 'A': return '#22c55e'; // green
-    case 'B': return '#3b82f6'; // blue
-    case 'C': return '#f59e0b'; // orange
-    case 'D': return '#ef4444'; // red
-    case 'F': return '#7f1d1d'; // dark red
-    default: return 'var(--primary)';
-  }
-}
-
-function getStudentQuizAttempts(studentId, quizId) {
-  const scores = JSON.parse(localStorage.getItem('studentQuizScores') || '{}');
-  return Object.values(scores).filter(s => s.studentId === studentId && s.quizId === quizId) || [];
-}
-
-function getQuizAttemptLimit(classId, quizId) {
-  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
-  const key = `${classId}_${quizId}`;
-  return limits[key] || 3; // Default 3 attempts
-}
-
-function setQuizAttemptLimit(classId, quizId, limit) {
-  const limits = JSON.parse(localStorage.getItem('quizAttemptLimits') || '{}');
-  const key = `${classId}_${quizId}`;
-  limits[key] = limit;
-  localStorage.setItem('quizAttemptLimits', JSON.stringify(limits));
-}
-
-function renderClassQuizSettings(classId) {
-  const classQuizzes = getClassQuizzes(classId);
-  
-  let html = '<div style="background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px;">';
-  html += '<h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Quiz Settings</h3>';
-  
-  if (classQuizzes.length === 0) {
-    html += '<p style="color: var(--on-surface-variant);">No quizzes assigned to this class yet.</p>';
-    html += '</div>';
-    return html;
-  }
-  
-  html += '<div style="max-height: 400px; overflow-y: auto;">';
-  classQuizzes.forEach(quiz => {
-    const limit = getQuizAttemptLimit(classId, quiz.id);
-    html += `
-      <div style="background: var(--input-bg); padding: 12px; border-radius: 6px; margin-bottom: 10px;">
-        <p style="font-weight: bold; margin-bottom: 8px;">${quiz.title}</p>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <label style="font-size: 14px;">Max Attempts:</label>
-          <input type="number" min="1" max="10" value="${limit}" 
-                 onchange="setQuizAttemptLimit('${classId}', '${quiz.id}', parseInt(this.value)); toast('✅ Attempt limit updated')"
-                 style="width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--on-surface);">
-        </div>
-      </div>
-    `;
-  });
-  html += '</div>';
-  html += `<button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
-           onclick="document.querySelector('[data-settings-overlay]').remove(); teacherTab='classes'; renderApp()">Close</button>`;
-  html += '</div>';
-  
-  return html;
-}
-
-function openQuizSettingsModal(classId) {
-  const html = renderClassQuizSettings(classId);
-  
-  const overlay = document.createElement('div');
-  overlay.setAttribute('data-settings-overlay', 'true');
-  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;';
-  overlay.innerHTML = `<div style="width: 90%; max-width: 500px;">${html}</div>`;
-  overlay.onclick = (e) => {
-    if (e.target === overlay) overlay.remove();
-  };
-  document.body.appendChild(overlay);
-}
-
-// ============= FIX FOR TEACHER SCORE DISPLAY =============
-
-// 1. Replace your renderStudentScoresView function with this fixed version:
-
-function renderStudentScoresView(classId) {
-  // Clean up old enrollments without studentId
-  cleanOldEnrollments();
-  
-  const enrollments = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]")
-    .filter(e => e.classId === classId);
-  const classQuizzes = getClassQuizzes(classId);
-  
-  // FIX: Get scores as an ARRAY, not object
-  let allScores = JSON.parse(localStorage.getItem('studentQuizScores') || '[]');
-  
-  // If it's stored as an object, convert to array
-  if (!Array.isArray(allScores)) {
-    allScores = Object.values(allScores);
-  }
-  
-  console.log('DEBUG: All scores:', allScores); // Debug log
-  console.log('DEBUG: Enrollments:', enrollments); // Debug log
-  console.log('DEBUG: Class quizzes:', classQuizzes); // Debug log
-  
-  if (enrollments.length === 0) {
-    return `<div class="p-6 text-center" style="background: var(--surface); color: var(--on-surface-variant); border-radius: 8px;">
-      No students enrolled in this class yet.
-    </div>`;
-  }
-  
-  let html = '<div style="overflow-x: auto;">';
-  
-  enrollments.forEach(enrollment => {
-    const student = getStudentById(enrollment.studentId);
-    html += `<div style="margin-bottom: 30px; padding: 15px; background: var(--input-bg); border-radius: 8px;">`;
-    html += `<h4 style="font-weight: bold; margin-bottom: 12px; color: var(--on-surface);">
-      Student: <span style="color: var(--primary); cursor: pointer; text-decoration: underline;" 
-                   onclick="openStudentInfoModal('${enrollment.studentId}')"
-                   title="Click to view student details">
-                   ${student.name || enrollment.studentId || 'Unknown'}
-                 </span>
-    </h4>`;
-    html += '<table style="width: 100%; border-collapse: collapse;">';
-    html += '<thead>';
-    html += '<tr style="background: var(--surface); border-bottom: 2px solid var(--border);">';
-    html += '<th style="padding: 12px; text-align: left; font-weight: bold; color: var(--on-surface); width: 20%;">Quiz</th>';
-    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 12%;">Attempt</th>';
-    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 12%;">Score</th>';
-    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 12%;">Grade</th>';
-    html += '<th style="padding: 12px; text-align: center; font-weight: bold; color: var(--on-surface); width: 22%;">Date</th>';
-    html += '</tr>';
-    html += '</thead>';
-    html += '<tbody>';
-    
-    // FIX: Filter scores properly
-    const studentScores = allScores.filter(s => {
-      return s && s.studentId === enrollment.studentId;
-    });
-    
-    console.log(`DEBUG: Scores for student ${enrollment.studentId}:`, studentScores);
-    
-    if (studentScores.length === 0) {
-      html += '<tr><td colspan="5" style="padding: 12px; text-align: center; color: var(--on-surface-variant);">No quiz attempts yet</td></tr>';
-    } else {
-      // Group scores by quiz
-      const scoresByQuiz = {};
-      studentScores.forEach(score => {
-        if (!scoresByQuiz[score.quizId]) {
-          scoresByQuiz[score.quizId] = [];
-        }
-        scoresByQuiz[score.quizId].push(score);
-      });
-      
-      classQuizzes.forEach(quiz => {
-        const quizAttempts = scoresByQuiz[quiz.id] || [];
-        
-        if (quizAttempts.length === 0) {
-          html += `<tr><td style="padding: 12px; color: var(--on-surface);">${quiz.title}</td>`;
-          html += '<td colspan="4" style="padding: 12px; text-align: center; color: var(--on-surface-variant);">Not attempted</td></tr>';
-        } else {
-          // Sort by date (oldest first)
-          quizAttempts.sort((a, b) => new Date(a.completedAt || 0) - new Date(b.completedAt || 0));
-          
-          quizAttempts.forEach((attempt, idx) => {
-            const percentage = attempt.percentage || Math.round((attempt.score / attempt.total) * 100);
-            const grade = getLetterGrade(percentage);
-            const gradeColor = getGradeColor(grade);
-            const date = new Date(attempt.completedAt || Date.now());
-            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            
-            html += `<tr style="border-bottom: 1px solid var(--border);">`;
-            if (idx === 0) {
-              html += `<td style="padding: 12px; color: var(--on-surface); font-weight: bold;">${quiz.title}</td>`;
-            } else {
-              html += `<td style="padding: 12px; color: var(--on-surface);"></td>`;
-            }
-            html += `<td style="padding: 12px; text-align: center; color: var(--on-surface);">${idx + 1}</td>`;
-            html += `<td style="padding: 12px; text-align: center; color: var(--on-surface);">${attempt.score || 0}/${attempt.total || 0}</td>`;
-            html += `<td style="padding: 12px; text-align: center;">
-              <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: ${gradeColor}; color: white; font-weight: bold;">
-                ${grade} (${percentage}%)
-              </span>
-            </td>`;
-            html += `<td style="padding: 12px; text-align: center; font-size: 12px; color: var(--on-surface-variant);">${dateStr}</td>`;
-            html += '</tr>';
-          });
-        }
-      });
-    }
-    
-    html += '</tbody>';
-    html += '</table>';
-    html += '</div>';
-  });
-  
-  html += '</div>';
-  
-  return html;
-}
-
-// 2. Make sure these helper functions exist:
-
-function getLetterGrade(percentage) {
-  if (percentage >= 90) return 'A';
-  if (percentage >= 80) return 'B';
-  if (percentage >= 70) return 'C';
-  if (percentage >= 60) return 'D';
-  return 'F';
-}
-
-function getGradeColor(grade) {
-  switch(grade) {
-    case 'A': return '#22c55e'; // green
-    case 'B': return '#3b82f6'; // blue
-    case 'C': return '#f59e0b'; // orange
-    case 'D': return '#ef4444'; // red
-    case 'F': return '#7f1d1d'; // dark red
-    default: return 'var(--primary)';
-  }
-}
-
-// 3. CRITICAL: When a student submits a quiz, make sure it saves like this:
-
-function saveStudentQuizScore(quizId, score, totalQuestions) {
-  const student = window.currentStudent;
-  
-  if (!student || !student.id) {
-    console.error('No student info found!');
-    return false;
-  }
-  
-  // Get existing scores
-  let scores = JSON.parse(localStorage.getItem('studentQuizScores') || '[]');
-  
-  // Ensure it's an array
-  if (!Array.isArray(scores)) {
-    scores = [];
-  }
-  
-  // Create score entry
-  const scoreEntry = {
-    studentId: student.id,
-    studentName: student.name,
-    quizId: quizId,
-    score: score,
-    total: totalQuestions,
-    percentage: Math.round((score / totalQuestions) * 100),
-    completedAt: new Date().toISOString()
-  };
-  
-  // Add to scores array
-  scores.push(scoreEntry);
-  
-  // Save back to localStorage
-  localStorage.setItem('studentQuizScores', JSON.stringify(scores));
-  
-  console.log('Score saved:', scoreEntry);
-  console.log('All scores now:', scores);
-  
-  return true;
-}
-
-// 4. Debug function - Add this to check what's stored:
-
-function debugScores() {
-  console.log('=== SCORE DEBUG ===');
-  
-  const raw = localStorage.getItem('studentQuizScores');
-  console.log('Raw data:', raw);
-  
-  if (!raw) {
-    console.log('No scores found in localStorage');
-    return;
-  }
-  
-  try {
-    const parsed = JSON.parse(raw);
-    console.log('Parsed scores:', parsed);
-    console.log('Is array?', Array.isArray(parsed));
-    console.log('Length:', Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length);
-  } catch (e) {
-    console.error('Error parsing scores:', e);
-  }
-  
-  console.log('=== END DEBUG ===');
-}
-
-function openStudentScoresModal(classId) {
-  const html = renderStudentScoresView(classId);
-  
-  const overlay = document.createElement('div');
-  overlay.setAttribute('data-scores-overlay', 'true');
-  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto;';
-  overlay.innerHTML = `<div style="width: 95%; max-width: 1200px; background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px; margin: 20px 0;">
-    <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Student Quiz Attempts & Scores</h3>
-    ${html}
-    <button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold;"
-             onclick="document.querySelector('[data-scores-overlay]').remove()">Close</button>
-  </div>`;
-  overlay.onclick = (e) => {
-    if (e.target === overlay) overlay.remove();
-  };
-  document.body.appendChild(overlay);
-}
-
-function openStudentInfoModal(studentId) {
-  const student = getStudentById(studentId);
-  const enrollments = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]")
-    .filter(e => e.studentId === studentId);
-  
-  // Get class names for enrolled classes
-  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
-  const enrolledClassNames = enrollments.map(e => {
-    const cls = allClasses.find(c => c.id === e.classId);
-    return cls ? cls.name : 'Unknown Class';
-  });
-
-  const overlay = document.createElement('div');
-  overlay.setAttribute('data-student-info-overlay', 'true');
-  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
-  overlay.innerHTML = `<div style="width: 95%; max-width: 500px; background: var(--surface); color: var(--on-surface); padding: 24px; border-radius: 12px; margin: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <h3 style="font-size: 20px; font-weight: bold; margin: 0;">👤 Student Information</h3>
-      <button onclick="document.querySelector('[data-student-info-overlay]').remove()" 
-              style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--on-surface-variant);">×</button>
-    </div>
-    
-    <div style="space-y: 16px;">
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Student ID</label>
-        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px; font-family: monospace;">${student.id}</div>
-      </div>
-      
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Name</label>
-        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.name || 'Not provided'}</div>
-      </div>
-      
-      ${student.email ? `
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Email</label>
-        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.email}</div>
-      </div>
-      ` : ''}
-      
-      ${student.school ? `
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">School</label>
-        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.school}</div>
-      </div>
-      ` : ''}
-      
-      ${student.grade ? `
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Grade Level</label>
-        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">${student.grade}</div>
-      </div>
-      ` : ''}
-      
-      ${student.profilePictureUrl ? `
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Profile Picture</label>
-        <img src="${student.profilePictureUrl}" alt="Profile" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
-      </div>
-      ` : ''}
-      
-      ${student.googleEmail ? `
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Google Account</label>
-        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">✅ ${student.googleEmail}</div>
-      </div>
-      ` : ''}
-      
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--on-surface-variant);">Enrolled Classes (${enrolledClassNames.length})</label>
-        <div style="padding: 8px 12px; background: var(--input-bg); border-radius: 6px;">
-          ${enrolledClassNames.length > 0 ? enrolledClassNames.join(', ') : 'No classes enrolled'}
-        </div>
-      </div>
-    </div>
-    
-    <button style="width: 100%; margin-top: 20px; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold; border: none;"
-             onclick="document.querySelector('[data-student-info-overlay]').remove()">Close</button>
-  </div>`;
-  overlay.onclick = (e) => {
-    if (e.target === overlay) overlay.remove();
-  };
-  document.body.appendChild(overlay);
-}
-
-// ============= TEACHER CLASSES VIEW =============
-
-function renderTeacherClassesView() {
-  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
-  const teacherClasses = getTeacherClasses(teacherId);
-
-  return `
-    <div class="space-y-6 w-full">
-      <!-- Create New Class Section -->
-      <div class="p-6 rounded-xl shadow space-y-4"
-           style="background-color: var(--surface); color: var(--on-surface);">
-        <h3 class="text-lg font-bold">Create a New Class</h3>
-        
-        <div>
-          <label class="block text-sm font-semibold mb-1">Class Name</label>
-          <input id="new-class-name" type="text"
-                 placeholder="e.g., Physics 101 - Period 3"
-                 class="w-full p-2 border rounded"
-                 style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);">
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold mb-1">Subject</label>
-            <input id="new-class-subject" type="text"
-                   placeholder="e.g., Physics"
-                   class="w-full p-2 border rounded"
-                   style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Grade Level</label>
-            <input id="new-class-grade" type="text"
-                   placeholder="e.g., 10th Grade"
-                   class="w-full p-2 border rounded"
-                   style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);">
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold mb-1">Description</label>
-          <textarea id="new-class-description"
-                    placeholder="Brief description of the class"
-                    class="w-full p-2 border rounded resize-none"
-                    style="border-color: var(--border); background: var(--input-bg); color: var(--on-surface);"
-                    rows="3"></textarea>
-        </div>
-
-        <button class="w-full px-4 py-2 rounded transition-colors font-semibold"
-                style="background-color: var(--primary); color: var(--on-primary);"
-                onclick="createNewClass()">
-          Create Class
-        </button>
-      </div>
-
-      <!-- Classes List -->
-      <div class="space-y-3">
-        <h3 class="text-lg font-bold" style="color: var(--on-surface);">My Classes</h3>
-        
-        ${teacherClasses.length === 0
-          ? `<div class="p-6 text-center rounded-xl"
-                 style="background-color: var(--surface-variant); color: var(--on-surface-variant);">
-              You haven't created any classes yet.
-            </div>`
-          : teacherClasses.map(cls => {
-              const classQuizzes = getClassQuizzes(cls.id);
-              const enrollments = JSON.parse(localStorage.getItem(STUDENT_CLASSES_KEY) || "[]")
-                .filter(e => e.classId === cls.id);
-              
-              return `
-              <div class="p-6 rounded-xl shadow space-y-4"
-                   style="background-color: var(--surface); color: var(--on-surface);">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h4 class="text-xl font-bold">${cls.name}</h4>
-                    <p class="text-sm" style="color: var(--on-surface-variant);">
-                      ${cls.subject || 'General'} • ${cls.grade || 'All Levels'}
-                    </p>
-                    ${cls.description ? `
-                      <p class="text-sm mt-1">${cls.description}</p>
-                    ` : ''}
-                  </div>
-                  <button class="px-3 py-1 text-sm rounded transition-colors"
-                          style="background-color: var(--error); color: var(--on-error);"
-                          onclick="deleteTeacherClass('${cls.id}')">
-                    Delete
-                  </button>
-                </div>
-
-                <!-- Class Code Section -->
-                <div class="p-3 rounded border-2"
-                     style="border-color: var(--primary); background-color: var(--input-bg);">
-                  <p class="text-xs font-semibold mb-1">Class Code (Share with Students)</p>
-                  <div class="flex gap-2 items-center">
-                    <code class="flex-1 p-2 rounded font-mono text-lg font-bold"
-                          style="background-color: var(--surface); color: var(--primary);">
-                      ${cls.classCode}
-                    </code>
-                    <button class="px-3 py-2 rounded text-sm transition-colors"
-                            style="background-color: var(--primary); color: var(--on-primary);"
-                            onclick="navigator.clipboard.writeText('${cls.classCode}'); toast('Code copied!')">
-                      Copy
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Enrollments Section -->
-                <div class="pt-3 border-t" style="border-color: var(--border);">
-                  <div class="flex justify-between items-center mb-2">
-                    <p class="text-sm font-semibold">👥 Enrolled Students (${enrollments.length})</p>
-                    <button class="px-2 py-1 text-xs rounded transition-colors"
-                            style="background-color: var(--primary); color: var(--on-primary);"
-                            onclick="openStudentScoresModal('${cls.id}')">
-                      📊 View Scores
-                    </button>
-                  </div>
-                  ${enrollments.length === 0
-                    ? `<p class="text-xs" style="color: var(--on-surface-variant);">No students enrolled yet</p>`
-                    : `<div class="space-y-1">
-                        ${enrollments.slice(0, 3).map(e => `
-                          <div class="text-xs p-1 rounded" style="background-color: var(--input-bg);">
-                            Student ID: ${e.studentId}
-                          </div>
-                        `).join('')}
-                        ${enrollments.length > 3 ? `
-                          <p class="text-xs" style="color: var(--on-surface-variant);">
-                            +${enrollments.length - 3} more student(s)
-                          </p>
-                        ` : ''}
-                      </div>`}
-                </div>
-
-                <!-- Quizzes Section -->
-                <div class="pt-3 border-t" style="border-color: var(--border);">
-                  <div class="flex justify-between items-center mb-2">
-                    <p class="text-sm font-semibold">📋 Class Quizzes (${classQuizzes.length})</p>
-                    <div class="flex gap-1">
-                      <button class="px-2 py-1 text-xs rounded transition-colors"
-                              style="background-color: var(--primary); color: var(--on-primary);"
-                              onclick="openQuizSettingsModal('${cls.id}')">
-                        ⚙️ Settings
-                      </button>
-                      <button class="px-2 py-1 text-xs rounded transition-colors"
-                              style="background-color: var(--primary); color: var(--on-primary);"
-                              onclick="openAddQuizToClassModal('${cls.id}')">
-                        + Add Quiz
-                      </button>
-                    </div>
-                  </div>
-                  
-                  ${classQuizzes.length === 0
-                    ? `<p class="text-xs" style="color: var(--on-surface-variant);">No quizzes assigned yet</p>`
-                    : classQuizzes.map(quiz => `
-                      <div class="mb-2 p-3 rounded"
-                           style="background-color: var(--input-bg);">
-                        <div class="flex justify-between items-start">
-                          <div class="flex-1">
-                            <p class="font-semibold text-sm">${quiz.title}</p>
-                            <p class="text-xs" style="color: var(--on-surface-variant);">
-                              ${quiz.questions?.length || 0} questions
-                              ${quiz.timeLimit ? ` | ${quiz.timeLimit} min` : ''}
-                            </p>
-                          </div>
-                          <button class="px-2 py-1 text-xs rounded transition-colors"
-                                  style="background-color: var(--error); color: var(--on-error);"
-                                  onclick="removeQuizFromClass('${cls.id}', '${quiz.id}')">
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    `).join('')}
-                </div>
-              </div>`;
-            }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function createNewClass() {
-  const name = document.getElementById('new-class-name')?.value?.trim();
-  const subject = document.getElementById('new-class-subject')?.value?.trim();
-  const grade = document.getElementById('new-class-grade')?.value?.trim();
-  const description = document.getElementById('new-class-description')?.value?.trim();
-  
-  if (!name) {
-    toast('❌ Class name is required');
-    return;
-  }
-  
-  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
-  const classId = 'class_' + Date.now();
-  const classCode = generateClassCode();
-  
-  const newClass = {
-    id: classId,
-    name: name,
-    subject: subject || '',
-    grade: grade || '',
-    description: description || '',
-    classCode: classCode,
-    teacherId: teacherId,
-    createdAt: new Date().toISOString()
-  };
-  
-  saveClass(newClass);
-  
-  // Clear inputs
-  document.getElementById('new-class-name').value = '';
-  document.getElementById('new-class-subject').value = '';
-  document.getElementById('new-class-grade').value = '';
-  document.getElementById('new-class-description').value = '';
-  
-  renderApp();
-  toast('✅ Class created successfully!');
-}
-
-function generateClassCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  
-  // Check if code already exists
-  const allClasses = JSON.parse(localStorage.getItem(TEACHER_CLASSES_KEY) || "[]");
-  if (allClasses.some(c => c.classCode === code)) {
-    return generateClassCode(); // Recursively generate if collision
-  }
-  
-  return code;
-}
-
-function deleteTeacherClass(classId) {
-  if (!confirm('Are you sure you want to delete this class? This action cannot be undone.')) return;
-  
-  const teacherId = window.currentTeacher?.id || 'teacher_' + localStorage.getItem('currentTeacherId');
-  const classes = getTeacherClasses(teacherId);
-  const filtered = classes.filter(c => c.id !== classId);
-  
-  localStorage.setItem(TEACHER_CLASSES_KEY, JSON.stringify(filtered));
-  
-  // Also remove associated quizzes
-  const allQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
-  const filteredQuizzes = allQuizzes.filter(q => q.classId !== classId);
-  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filteredQuizzes));
-  
-  renderApp();
-  toast('Class and associated quizzes deleted');
-}
-
-function openAddQuizToClassModal(classId) {
-  // Get all quizzes from localStorage
-  const quizzes = [];
-  
-  // Search through all localStorage keys for teacher quizzes
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
-      try {
-        const stored = JSON.parse(localStorage.getItem(key) || '[]');
-        if (Array.isArray(stored)) {
-          quizzes.push(...stored);
-        }
-      } catch (e) {
-        console.error('Error parsing quiz key:', key, e);
-      }
-    }
-  }
-  
-  if (quizzes.length === 0) {
-    toast('❌ You need to create quizzes first in the Dashboard');
-    return;
-  }
-  
-  // Show modal to select quiz
-  let html = '<div style="background: var(--surface); color: var(--on-surface); padding: 20px; border-radius: 8px;">';
-  html += '<h3 style="font-size: 18px; font-weight: bold; margin-bottom: 15px;">Add Quiz to Class</h3>';
-  html += '<p style="font-size: 14px; margin-bottom: 15px; color: var(--on-surface-variant);">Select a quiz to add to this class:</p>';
-  html += '<div style="max-height: 400px; overflow-y: auto; space-y: 2;">';
-  
-  quizzes.forEach(quiz => {
-    html += `
-      <div style="background: var(--input-bg); padding: 10px; border-radius: 6px; margin-bottom: 10px; cursor: pointer;"
-           onclick="assignQuizToClass('${classId}', '${quiz.quizId || quiz.id}'); toast('✅ Quiz added to class')">
-        <p style="font-weight: bold;">${quiz.title || quiz.quizName || 'Untitled Quiz'}</p>
-        <p style="font-size: 12px; color: var(--on-surface-variant);">${quiz.questions?.length || 0} questions</p>
-      </div>
-    `;
-  });
-  
-  html += '</div>';
-  html += `<button style="width: 100%; margin-top: 15px; padding: 10px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold;"
-           onclick="document.querySelector('[data-modal-overlay]').remove(); teacherTab='classes'; renderApp()">Close</button>`;
-  html += '</div>';
-  
-  // Show as overlay
-  const overlay = document.createElement('div');
-  overlay.setAttribute('data-modal-overlay', 'true');
-  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;';
-  overlay.innerHTML = `<div style="width: 90%; max-width: 500px;">${html}</div>`;
-  overlay.onclick = (e) => {
-    if (e.target === overlay) overlay.remove();
-  };
-  document.body.appendChild(overlay);
-}
-
-function assignQuizToClass(classId, quizId) {
-  // Find quiz from all storage locations
-  let quiz = null;
-  
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key === 'teacher-quizzes' || key.startsWith('teacher_quizzes_')) {
-      try {
-        const stored = JSON.parse(localStorage.getItem(key) || '[]');
-        if (Array.isArray(stored)) {
-          quiz = stored.find(q => q.quizId === quizId || q.id === quizId);
-          if (quiz) break;
-        }
-      } catch (e) {
-        console.error('Error parsing quiz key:', key, e);
-      }
-    }
-  }
-  
-  if (!quiz) {
-    toast('Quiz not found');
-    return;
-  }
-  
-  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
-  
-  // Check if already added
-  if (classQuizzes.some(cq => cq.classId === classId && cq.id === quizId)) {
-    toast('This quiz is already in the class');
-    return;
-  }
-  
-  // If quiz doesn't have questions locally, try to fetch from Cloudflare
-  let questions = quiz.questions || [];
-  
-  if (!questions || questions.length === 0) {
-    // Try to fetch from Cloudflare (async, but we'll save what we have)
-    toast('⏳ Fetching quiz details...');
-    
-    // Fetch from Cloudflare in background
-    (async () => {
-      try {
-        const cfData = await getQuizFromCloudflare(quizId);
-        if (cfData && cfData.questions) {
-          questions = cfData.questions;
-          
-          // Update the stored quiz with questions
-          const key = `teacher_quizzes_${getUser().id}`;
-          const stored = JSON.parse(localStorage.getItem(key) || '[]');
-          const idx = stored.findIndex(q => q.quizId === quizId);
-          if (idx >= 0) {
-            stored[idx].questions = questions;
-            localStorage.setItem(key, JSON.stringify(stored));
-          }
-          
-          // Update class quiz with questions
-          const classQuizzes2 = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
-          const cqIdx = classQuizzes2.findIndex(cq => cq.classId === classId && cq.id === quizId);
-          if (cqIdx >= 0) {
-            classQuizzes2[cqIdx].questions = questions;
-            localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes2));
-          }
-          
-          toast('✅ Quiz added with ' + questions.length + ' questions!');
-          renderApp();
-        }
-      } catch (err) {
-        console.log('Could not fetch from Cloudflare, using local data');
-      }
-    })();
-  }
-  
-  const classQuiz = {
-    id: quizId,
-    classId: classId,
-    title: quiz.quizName || quiz.title || 'Untitled Quiz',
-    questions: questions,
-    timeLimit: null, // Can be set later
-    createdAt: new Date().toISOString()
-  };
-  
-  classQuizzes.push(classQuiz);
-  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(classQuizzes));
-  
-  teacherTab = 'classes';
-  renderApp();
-}
-
-function removeQuizFromClass(classId, quizId) {
-  if (!confirm('Remove this quiz from the class?')) return;
-  
-  const classQuizzes = JSON.parse(localStorage.getItem(CLASS_QUIZZES_KEY) || "[]");
-  const filtered = classQuizzes.filter(q => !(q.classId === classId && q.id === quizId));
-  localStorage.setItem(CLASS_QUIZZES_KEY, JSON.stringify(filtered));
-  
-  renderApp();
-  toast('Quiz removed from class');
 }
 
 
@@ -5398,29 +3824,19 @@ function renderTeacherQuizList() {
                style="background: var(--card-bg); color: var(--text); border-radius: var(--radius);">
             <h3 class="text-xl font-semibold mb-6" style="color: var(--text);">📊 Item Analysis Dashboard</h3>
 
-            <div class="mt-8 pt-6" style="border-top: 1px solid var(--border);">
-              <div class="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div class="text-2xl font-bold" style="color: var(--primary); font-weight: var(--font-weight-bold);">${getTotalSubjects()}</div>
-                  <div class="text-xs" style="color: var(--text-muted);">Subjects</div>
-                </div>
-                <div>
-                  <div class="text-2xl font-bold" style="color: var(--success); font-weight: var(--font-weight-bold);">${getTotalCards()}</div>
-                  <div class="text-xs" style="color: var(--text-muted);">Cards</div>
-                </div>
-                <div>
-                  <div class="text-2xl font-bold" style="color: var(--accent); font-weight: var(--font-weight-bold);">${getTotalQuizzes()}</div>
-                  <div class="text-xs" style="color: var(--text-muted);">Quizzes</div>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div class="card p-4 text-center">
+                <div class="text-2xl font-bold text-primary mb-2">85%</div>
+                <div class="text-sm text-text-muted">Average Score</div>
               </div>
-            </div>
-
-            <div class="mt-6">
-              <button onclick="currentView='backup'; renderApp();" 
-                      class="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105"
-                      style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface-hover) 100%); color: var(--text); border: 1px solid var(--border);">
-                📦 Backup & Restore
-              </button>
+              <div class="card p-4 text-center">
+                <div class="text-2xl font-bold text-success mb-2">12</div>
+                <div class="text-sm text-text-muted">Total Quizzes</div>
+              </div>
+              <div class="card p-4 text-center">
+                <div class="text-2xl font-bold text-warning mb-2">3.2</div>
+                <div class="text-sm text-text-muted">Avg Difficulty</div>
+              </div>
             </div>
 
             <div class="card p-4 mb-6">
@@ -5545,9 +3961,9 @@ async function generatePDFQuiz() {
     formData.append('numQuestions', count);
 
     // Use local backend or replace with your deployed URL
-    const PDFbackendUrl = getBackendUrl();
+    const backendUrl = localStorage.getItem('backendUrl') || 'http://localhost:5000';
 
-    const res = await fetch(`${PDFbackendUrl}/api/generate-quiz-from-document`, {
+    const res = await fetch(`${backendUrl}/api/generate-quiz-from-document`, {
       method: 'POST',
       body: formData
     });
@@ -5558,15 +3974,6 @@ async function generatePDFQuiz() {
     }
 
     const data = await res.json();
-
-    // Validate that backend is returning meaningful data, not placeholders
-    const hasPlaceholders = data.questions.some(q => 
-      (q.options || []).some(opt => /^option\s+[a-d]$/i.test(opt.trim()))
-    );
-
-    if (hasPlaceholders) {
-      throw new Error('Backend returned placeholder options. The PDF analyzer may not be working correctly. Please check your backend configuration.');
-    }
 
     // Process the generated questions into the format we need
     teacherQuestions = data.questions.map(q => {
@@ -5596,7 +4003,7 @@ async function generatePDFQuiz() {
     resultDiv.innerHTML = `
       <div class="p-4 rounded-xl" style="background: rgba(34,197,94,.1);">
         ✅ Successfully generated ${data.questions.length} questions from ${file.name}!
-        <br><small class="text-text-muted">Analyzed ${data.charactersAnalyzed || 'unknown'} characters from the document.</small>
+        <br><small class="text-text-muted">Analyzed ${data.charactersAnalyzed} characters from the document.</small>
       </div>
     `;
 
@@ -5610,7 +4017,7 @@ async function generatePDFQuiz() {
     resultDiv.innerHTML = `
       <div class="p-4 rounded-xl" style="background: rgba(220,38,38,.1);">
         ❌ Error: ${err.message}
-        <br><small class="text-text-muted">The backend PDF analyzer needs to be fixed to extract meaningful content from documents.</small>
+        <br><small class="text-text-muted">Make sure your backend is running and configured correctly.</small>
       </div>
     `;
     toast("❌ Failed to generate quiz: " + err.message);
@@ -5823,7 +4230,7 @@ async function generateAIQuiz() {
 
   try {
     // Use backend URL from localStorage or default
-    const backendUrl = localStorage.getItem('backendUrl') || 'https://flashcards-ai-backend.onrender.com';
+    const backendUrl = localStorage.getItem('backendUrl') || 'http://localhost:5000';
 
     const res = await fetch(`${backendUrl}/api/generate-quiz`, {
       method: "POST",
@@ -6012,53 +4419,43 @@ async function submitTeacherQuiz() {
     return;
   }
 
-  if (isQuizPreview) {
-    toast("Preview finished! No results were saved.");
-    isQuizPreview = false;
-    return;
-  }
+  const isEditing = !!window._teacherEditingQuizId;
+
+  const url = isEditing
+    ? `${getBackendUrl()}/api/quizzes/${window._teacherEditingQuizId}`
+    : `${getBackendUrl()}/api/quizzes`;
+
+  const method = isEditing ? "PUT" : "POST";
 
   try {
-    const isEditing = !!window._teacherEditingQuizId;
-    let quizId;
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        questions: teacherQuestions,
+      }),
+    });
 
-    if (isEditing) {
-      // For editing, update locally in teacher quizzes
-      quizId = window._teacherEditingQuizId;
-      const quizIndex = teacherQuizzes.findIndex(q => q.quizId === quizId);
-      if (quizIndex !== -1) {
-        teacherQuizzes[quizIndex].title = title;
-        teacherQuizzes[quizIndex].questions = [...teacherQuestions];
-        saveTeacherQuizzes();
-      }
-      toast("✅ Quiz updated successfully!");
-    } else {
-      // For new quizzes, save to Cloudflare and use the returned ID
-      const cfResult = await createQuizOnCloudflare(title, teacherQuestions);
-      
-      if (!cfResult || cfResult.error) {
-        toast("⚠️ Failed to sync to cloud: " + (cfResult?.error || "Unknown error"));
-        // Generate local ID as fallback
-        quizId = "quiz_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-      } else {
-        // Use the quiz ID returned from Cloudflare
-        quizId = cfResult.quiz?.id || cfResult.id;
-        if (!quizId) {
-          console.error('No quiz ID returned from Cloudflare:', cfResult);
-          toast("⚠️ Quiz created but couldn't retrieve ID from cloud");
-          quizId = "quiz_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-        } else {
-          toast("✅ Quiz created and synced to cloud!");
-          console.log('Quiz created with ID:', quizId);
-        }
-      }
-      
-      // Also save locally for offline access (BEFORE clearing teacherQuestions)
+    const data = await res.json(); // read once
+
+    if (!res.ok) {
+      toast(data.error || "Failed to save quiz");
+      return;
+    }
+
+    if (!isEditing) {
       saveTeacherQuiz({
-        quizId,
+        quizId: data.quizId,
         title,
         questions: teacherQuestions // PASS THE QUESTIONS ARRAY
       });
+    }
+
+    if (isQuizPreview) {
+      toast("Preview finished! No results were saved.");
+      isQuizPreview = false;
+      return;
     }
 
     window._teacherEditingQuizId = null;
@@ -6140,15 +4537,18 @@ async function loadStudentQuiz() {
   }
 
   try {
-    // Try to fetch from Cloudflare first
-    const data = await getQuizFromCloudflare(quizId);
+    const res = await fetch(
+      `${getBackendUrl()}/api/quizzes/${quizId}`
+    );
 
-    if (!data || data.error) {
+    if (!res.ok) {
       document.getElementById("student-error").innerText = "Quiz not found";
       return;
     }
 
-    quizQuestions = data.questions || [];
+    const data = await res.json();
+
+    quizQuestions = data.questions;
     quizIds = quizId;
     currentQuizId = quizId;
     quizIndex = 0;
@@ -6160,8 +4560,7 @@ async function loadStudentQuiz() {
     renderApp();
 
   } catch (err) {
-    document.getElementById("student-error").innerText = "Network error: " + err.message;
-    console.error("Error loading quiz:", err);
+    document.getElementById("student-error").innerText = "Network error";
   }
 }
 
@@ -6173,41 +4572,22 @@ async function loadStudentQuiz(quizIdParam) {
     return;
   }
 
-  // ⚠️ REQUIRE ACCOUNT FIRST
   if (!window.currentStudent || !window.currentStudent.name || !window.currentStudent.id) {
-    // Save the quiz ID to resume after account setup
     pendingQuizId = quizId;
-    
-    // Show warning
-    document.getElementById("student-error").innerText = "⚠️ Please create your account first before entering a quiz";
-    
-    // Show modal after brief delay so user sees the warning
-    setTimeout(() => {
-      openStudentInfoModal();
-    }, 500);
+    openStudentInfoModal();
     return;
   }
 
   try {
-    // Show loading state
-    document.getElementById("student-error").innerText = "Loading quiz...";
-    
-    // Fetch from Cloudflare
-    const data = await getQuizFromCloudflare(quizId);
-
-    if (!data || data.error) {
-      console.error('Quiz data error:', data);
-      document.getElementById("student-error").innerText = "❌ Quiz not found. Make sure the quiz ID is correct and hasn't expired.";
+    const res = await fetch(`${getBackendUrl()}/api/quizzes/${quizId}`);
+    if (!res.ok) {
+      document.getElementById("student-error").innerText = "Quiz not found";
       return;
     }
 
-    const questions = data.questions || [];
-    if (!questions || questions.length === 0) {
-      document.getElementById("student-error").innerText = "❌ Quiz has no questions";
-      return;
-    }
+    const data = await res.json();
 
-    quizQuestions = questions;
+    quizQuestions = data.questions;
     currentQuizId = quizId;
     quizIndex = 0;
     quizScore = 0;
@@ -6216,15 +4596,11 @@ async function loadStudentQuiz(quizIdParam) {
     answeredQuestions = new Set();
     confirmedAnswers = {};
 
-    // Clear any error messages
-    document.getElementById("student-error").innerText = "";
-    
     currentView = "teacher-quiz";
     renderApp();
 
   } catch (err) {
-    console.error("Error loading quiz:", err);
-    document.getElementById("student-error").innerText = `❌ Error: ${err.message}`;
+    document.getElementById("student-error").innerText = "Network error";
   }
 }
 
@@ -6450,24 +4826,17 @@ function finishStudentQuiz() {
     return;
   }
 
-  // Save locally
-  saveStudentScore({
-    studentName: window.currentStudent.name,
-    studentId: window.currentStudent.id,
-    quizId: currentQuizId,
-    score: quizScore,
-    total: quizQuestions.length,
-    date: Date.now()
-  });
-
-  saveQuizScoreNow(); 
+  // ✅ SAVE BEFORE submitting to cloud (score is already calculated)
+  const saved = saveQuizScoreNow();
+  
+  if (!saved) {
+    console.warn("⚠️ Failed to save quiz score locally");
+  }
 
   // Submit to Cloudflare
   (async () => {
     try {
       const answers = {};
-      
-      // Reconstruct answers from quizAnswers object
       for (const [key, value] of Object.entries(window.quizAnswers || {})) {
         const questionIndex = parseInt(key.replace('q', ''));
         if (!isNaN(questionIndex)) {
@@ -6476,7 +4845,6 @@ function finishStudentQuiz() {
       }
 
       const result = await submitQuizToCloudflare(currentQuizId, answers);
-      
       if (result && !result.error) {
         console.log("✅ Quiz submission synced to cloud:", result);
       } else {
@@ -6484,7 +4852,6 @@ function finishStudentQuiz() {
       }
     } catch (error) {
       console.warn("⚠️ Could not sync quiz results to cloud:", error.message);
-      // Continue anyway - results are saved locally
     }
   })();
 
@@ -6494,13 +4861,13 @@ function finishStudentQuiz() {
 }
 
 // ============= SAVE QUIZ SCORE TO LOCALSTORAGE =============
+// ============= SAVE QUIZ SCORE TO LOCALSTORAGE =============
 function saveQuizScoreNow() {
   // Get current student data
   const student = window.currentStudent || JSON.parse(localStorage.getItem("currentStudent") || "{}");
   
   if (!student || !student.id || !student.name) {
     console.warn("⚠️ Cannot save quiz score: Student not logged in");
-    toast("⚠️ Student info missing - score not saved");
     return false;
   }
 
@@ -6512,9 +4879,36 @@ function saveQuizScoreNow() {
     return false;
   }
 
+  // ✅ DEBUG: Log values before saving
+  console.log("📊 Saving Quiz Score:", {
+    studentId: student.id,
+    studentName: student.name,
+    quizId: quizId,
+    quizScore: quizScore,
+    quizQuestionsLength: quizQuestions.length
+  });
+
+  // Safety check - ensure we have valid numbers
+  if (typeof quizScore !== 'number' || quizScore < 0) {
+    console.error("❌ Invalid quizScore:", quizScore);
+    return false;
+  }
+
+  if (typeof quizQuestions !== 'object' || !Array.isArray(quizQuestions) || quizQuestions.length === 0) {
+    console.error("❌ Invalid quizQuestions:", quizQuestions);
+    return false;
+  }
+
   // Calculate percentage
-  const percentage = Math.round((quizScore / quizQuestions.length) * 100);
+  const totalQuestions = quizQuestions.length;
+  const percentage = Math.round((quizScore / totalQuestions) * 100);
   const letterGrade = getLetterGrade(percentage);
+
+  // Validate percentage
+  if (isNaN(percentage)) {
+    console.error("❌ Percentage is NaN:", { quizScore, totalQuestions });
+    return false;
+  }
 
   // Get existing scores
   const allScores = JSON.parse(localStorage.getItem("studentQuizScores") || "[]");
@@ -6526,7 +4920,7 @@ function saveQuizScoreNow() {
     studentName: student.name,
     quizId: quizId,
     score: quizScore,
-    total: quizQuestions.length,
+    total: totalQuestions,
     percentage: percentage,
     letterGrade: letterGrade,
     completedAt: new Date().toISOString(),
@@ -6539,7 +4933,8 @@ function saveQuizScoreNow() {
   // Save to localStorage
   try {
     localStorage.setItem("studentQuizScores", JSON.stringify(allScores));
-    console.log("✅ Quiz score saved:", scoreRecord);
+    console.log("✅ Quiz score saved successfully:", scoreRecord);
+    toast("✅ Score saved: " + quizScore + "/" + totalQuestions + " (" + percentage + "%)");
     return true;
   } catch (error) {
     console.error("❌ Failed to save quiz score:", error);
@@ -6586,36 +4981,11 @@ function answerTeacherQuiz(selectedLetter) {
 function selectTeacherQuiz(letter) {
   selectedAnswer = letter;
   // Update button styles without re-rendering
-  // Find the quiz container first, then the buttons within it
-  const quizContainer = document.querySelector('[class*="teacher-quiz"]') || 
-                        document.querySelector('.max-w-4xl') ||
-                        document.querySelector('.fade-in');
-  
-  if (!quizContainer) {
-    console.warn("Could not find quiz container");
-    return;
-  }
-
-  // Look for buttons in the container
-  const buttons = quizContainer.querySelectorAll('button[onclick*="selectTeacherQuiz"]');
-  
+  const buttons = document.querySelectorAll('.max-w-4xl.mx-auto.fade-in.w-full .grid.gap-4.md\\:gap-6 button');
   if (buttons.length === 0) {
-    // Fallback: try to find option buttons by looking for A, B, C, D text
-    const allButtons = quizContainer.querySelectorAll('button');
-    if (allButtons.length > 0) {
-      const letters = ['A', 'B', 'C', 'D'];
-      allButtons.forEach((btn, j) => {
-        if (j < 4) {  // Only the first 4 buttons are options
-          const isSelected = letters[j] === letter;
-          btn.classList.toggle('selected', isSelected);
-        }
-      });
-      return;
-    }
     console.warn("Could not find quiz option buttons to update");
     return;
   }
-
   const letters = ['A', 'B', 'C', 'D'];
   buttons.forEach((btn, j) => {
     const isSelected = letters[j] === letter;
@@ -6648,8 +5018,8 @@ function nextTeacherQuiz() {
     selectedAnswer = null;
     renderApp();
   } else {
-    saveQuizScoreNow();
-    finishStudentQuiz();
+    currentView = "teacher-quiz-result";
+    renderApp();
   }
 }
 
@@ -7002,11 +5372,11 @@ function renderStudentScoreHistoryView() {
 
 
 function renderTeacherQuizResultView() {
-      if (!window._scoreAlreadySaved) {
+    if (!window._scoreAlreadySaved) {
     saveQuizScoreNow();
     window._scoreAlreadySaved = true;
   }
-  
+
   if (!teacherQuizData || !teacherQuizData.questions) {
     console.warn("Teacher quiz result rendered without data");
     currentView = "home";
@@ -7675,8 +6045,6 @@ function renderApp() {
     content = renderClassQuizView();
   } else if (currentView === "quiz-result") {
     content = renderQuizResultView();
-  } else if (currentView === "backup") {
-    content = renderBackupView();
   } else if (currentView === "customize") {
     content = renderCustomizationPanel();
   }
@@ -7714,8 +6082,22 @@ function renderApp() {
     app.innerHTML += renderBottomNav();
   }
 
-}
+  if (currentView === "browse-study") {
+    setTimeout(() => {
+     const card = currentBrowseSetCards[currentBrowseCardIndex];
+      const answerEl = document.getElementById("answerMath");
 
+      if (answerEl && card?.answer?.mathml) {
+       answerEl.innerHTML = card.answer.mathml;
+
+       // Optional MathJax support
+       if (window.MathJax) {
+         MathJax.typesetPromise([answerEl]);
+       }
+      }
+    }, 0);
+  }
+}
 
 function renderSubjectsView() {
   const subjects = getSubjects();
@@ -8350,104 +6732,75 @@ function renderClassQuizView() {
   const progress = ((state.currentIndex + 1) / questions.length) * 100;
   
   if (!currentQuestion) {
-    // Quiz finished - show results with letter grade
-    const percentage = Math.round((state.score / questions.length) * 100);
-    const letterGrade = getLetterGrade(percentage);
-    const gradeColor = getGradeColor(letterGrade);
-    const attemptCount = getStudentQuizAttempts(window.currentStudent?.id, window._classQuizId).length;
-    const attemptLimit = getQuizAttemptLimit(window._classQuiz.classId, window._classQuizId);
-    
+    // Quiz finished - show results
     return `
       <div class="p-6 rounded-xl shadow space-y-6"
            style="background-color: var(--surface); color: var(--on-surface); max-width: 600px; margin: 0 auto;">
         
         <h2 class="text-2xl font-bold text-center">Quiz Complete!</h2>
         
-        <!-- Large Grade Display -->
         <div class="p-6 rounded-lg text-center"
-             style="background: linear-gradient(135deg, ${gradeColor}, ${gradeColor}dd);">
-          <div style="font-size: 72px; font-weight: bold; margin-bottom: 10px; color: white;">${letterGrade}</div>
-          <div style="font-size: 28px; font-weight: bold; color: white; margin-bottom: 5px;">${state.score}/${questions.length}</div>
-          <div style="font-size: 18px; color: rgba(255,255,255,0.9);">Score: ${percentage}%</div>
+             style="background: linear-gradient(135deg, var(--primary), var(--primary)dd); color: white;">
+          <div style="font-size: 48px; font-weight: bold; margin-bottom: 10px;">${state.score}/${questions.length}</div>
+          <div style="font-size: 18px;">Score: ${Math.round((state.score / questions.length) * 100)}%</div>
         </div>
         
-        <!-- Attempt Info -->
-        <div class="p-4 rounded-lg text-center"
-             style="background: var(--input-bg); border-left: 4px solid ${attemptCount >= attemptLimit ? 'var(--error)' : 'var(--primary)'};">
-          <p style="font-size: 14px; font-weight: bold;">Attempts: ${attemptCount} / ${attemptLimit}</p>
-          ${attemptCount < attemptLimit ? `
-            <p style="font-size: 12px; color: var(--on-surface-variant); margin-top: 4px;">You can retake this quiz</p>
-          ` : `
-            <p style="font-size: 12px; color: var(--error); margin-top: 4px;">❌ Maximum attempts reached</p>
-          `}
-        </div>
-        
-        <!-- Answer Review -->
-        <div style="max-height: 300px; overflow-y: auto;">
-          <h3 style="font-weight: bold; margin-bottom: 10px;">Answer Review</h3>
-          <div class="space-y-3">
-            ${questions.map((q, idx) => {
-              const correctAnswer = q.correctAnswer || q.correct;
-              const userAnswer = state.answers[idx];
-              
-              // Convert user answer to letter format if it's full text
-              let userAnswerLetter = userAnswer;
-              if (userAnswer && userAnswer.length > 1) {
-                const answerIndex = (q.options || []).indexOf(userAnswer);
-                userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
-              }
-              
-              // Determine the letter of the correct answer
-              let correctAnswerLetter = 'N/A';
-              if (correctAnswer && correctAnswer.length === 1 && correctAnswer >= 'A' && correctAnswer <= 'Z') {
-                correctAnswerLetter = correctAnswer;
-              } else {
-                const correctAnswerIndex = (q.options || []).indexOf(correctAnswer);
-                correctAnswerLetter = correctAnswerIndex >= 0 ? String.fromCharCode(65 + correctAnswerIndex) : 'N/A';
-              }
-              
-              // Compare the letter versions
-              const isCorrect = userAnswerLetter === correctAnswerLetter;
-              return `
-              <div class="p-4 rounded-lg"
-                   style="background: var(--input-bg); border-left: 4px solid ${isCorrect ? '#22c55e' : '#ef4444'};">
-                <p class="font-semibold mb-2" style="color: ${isCorrect ? '#22c55e' : '#ef4444'};">
-                  ${isCorrect ? '✓' : '✗'} Question ${idx + 1}: ${q.question}
+        <div class="space-y-3">
+          ${questions.map((q, idx) => {
+            const correctAnswer = q.correctAnswer || q.correct;
+            const userAnswer = state.answers[idx];
+            
+            // Convert user answer to letter format if it's full text
+            let userAnswerLetter = userAnswer;
+            if (userAnswer && userAnswer.length > 1) {
+              const answerIndex = (q.options || []).indexOf(userAnswer);
+              userAnswerLetter = answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : userAnswer;
+            }
+            
+            // Determine the letter of the correct answer
+            let correctAnswerLetter = 'N/A';
+            if (correctAnswer && correctAnswer.length === 1 && correctAnswer >= 'A' && correctAnswer <= 'Z') {
+              // Already a letter (A, B, C, D)
+              correctAnswerLetter = correctAnswer;
+            } else {
+              // Find the letter of the correct answer in options
+              const correctAnswerIndex = (q.options || []).indexOf(correctAnswer);
+              correctAnswerLetter = correctAnswerIndex >= 0 ? String.fromCharCode(65 + correctAnswerIndex) : 'N/A';
+            }
+            
+            // Compare the letter versions
+            const isCorrect = userAnswerLetter === correctAnswerLetter;
+            return `
+            <div class="p-4 rounded-lg"
+                 style="background: var(--input-bg); border-left: 4px solid ${isCorrect ? 'var(--success)' : 'var(--error)'};">
+              <p class="font-semibold mb-2">Question ${idx + 1}: ${q.question}</p>
+              <p class="text-sm mb-1">
+                <strong>Your Answer:</strong> 
+                <span style="color: ${isCorrect ? 'var(--success)' : 'var(--error)'};">
+                  ${state.answers[idx] ? (() => {
+                    const answerIndex = (q.options || []).indexOf(state.answers[idx]);
+                    return answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : 'Not answered';
+                  })() : 'Not answered'}
+                </span>
+              </p>
+              ${!isCorrect ? `
+                <p class="text-sm">
+                  <strong>Correct Answer:</strong>
+                  <span style="color: var(--success);">${(() => {
+                    const correctAnswerIndex = (q.options || []).indexOf(correctAnswer);
+                    return correctAnswerIndex >= 0 ? String.fromCharCode(65 + correctAnswerIndex) : 'N/A';
+                  })()}</span>
                 </p>
-                <p class="text-sm mb-1">
-                  <strong>Your Answer:</strong> 
-                  <span style="color: ${isCorrect ? '#22c55e' : '#ef4444'};">
-                    ${state.answers[idx] ? (() => {
-                      const answerIndex = (q.options || []).indexOf(state.answers[idx]);
-                      return answerIndex >= 0 ? String.fromCharCode(65 + answerIndex) : 'Not answered';
-                    })() : 'Not answered'}
-                  </span>
-                </p>
-                ${!isCorrect ? `
-                  <p class="text-sm">
-                    <strong>Correct Answer:</strong>
-                    <span style="color: #22c55e;">${correctAnswerLetter}</span>
-                  </p>
-                ` : ''}
-              </div>
-            `;
-            }).join('')}
-          </div>
+              ` : ''}
+            </div>
+          `;
+          }).join('')}
         </div>
         
-        <!-- Action Buttons -->
-        <div class="space-y-2">
-          ${attemptCount < attemptLimit ? `
-            <button style="width: 100%; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px;"
-                    onclick="window._classQuizState = null; startClassQuiz(window._classQuizId)">
-              Retake Quiz
-            </button>
-          ` : ''}
-          <button style="width: 100%; padding: 12px; background: var(--surface-variant); color: var(--on-surface); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px;"
-                  onclick="currentView='student'; studentTab='classes'; window._classQuiz = null; window._classQuizState = null; renderApp()">
-            Back to Classes
-          </button>
-        </div>
+        <button style="width: 100%; padding: 12px; background: var(--primary); color: var(--on-primary); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px;"
+                onclick="currentView='student'; studentTab='classes'; window._classQuiz = null; window._classQuizState = null; renderApp()">
+          Back to Classes
+        </button>
       </div>
     `;
   }
@@ -8806,260 +7159,6 @@ function toggleTimerControls(value) {
   renderApp();
 }
 
-
-function renderBackupView() {
-  return `
-    <div class="mobile-optimized w-full h-full p-4">
-      <div class="max-w-4xl mx-auto">
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-6">
-          <button onclick="currentView='home'; renderApp();" 
-                  class="p-2 rounded-lg transition-all duration-200 hover:scale-105" 
-                  style="background: var(--surface); color: var(--text);">
-            <span class="text-xl">⬅️</span>
-          </button>
-          <h2 class="text-2xl font-bold" style="color: var(--text);">📦 Backup & Restore</h2>
-          <div class="w-10"></div>
-        </div>
-
-        <!-- Backup Status -->
-        <div class="card p-4 mb-6" style="background: var(--card-bg); border-radius: 12px;">
-          <h3 class="text-lg font-semibold mb-3" style="color: var(--text);">Backup Status</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <span class="text-sm opacity-70" style="color: var(--text-muted);">Last Backup:</span>
-              <div class="font-medium" style="color: var(--text);" id="last-backup-time">
-                ${localStorage.getItem('lastBackupTime') ? new Date(localStorage.getItem('lastBackupTime')).toLocaleString() : 'Never'}
-              </div>
-            </div>
-            <div>
-              <span class="text-sm opacity-70" style="color: var(--text-muted);">Backup ID:</span>
-              <div class="font-medium text-sm" style="color: var(--text);" id="last-backup-id">
-                ${localStorage.getItem('lastBackupId') || 'No backup'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <!-- Create Backup -->
-          <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
-            <h3 class="text-lg font-semibold mb-2" style="color: var(--text);">📤 Create Backup</h3>
-            <p class="text-sm mb-4 opacity-80" style="color: var(--text);">
-              Backup all your classes, students, quiz data, and settings to the cloud.
-            </p>
-            <button onclick="createBackup()" 
-                    class="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105"
-                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white;">
-              🚀 Backup Now
-            </button>
-          </div>
-
-          <!-- Restore Backup -->
-          <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
-            <h3 class="text-lg font-semibold mb-2" style="color: var(--text);">📥 Restore Backup</h3>
-            <p class="text-sm mb-4 opacity-80" style="color: var(--text);">
-              Restore your data from a previous cloud backup.
-            </p>
-            <button onclick="loadBackups()" 
-                    class="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105"
-                    style="background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%); color: white;">
-              🔄 View Backups
-            </button>
-          </div>
-        </div>
-
-        <!-- Auto-backup Settings -->
-        <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
-          <h3 class="text-lg font-semibold mb-3" style="color: var(--text);">⚙️ Auto-backup Settings</h3>
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="font-medium" style="color: var(--text);">Automatic Daily Backup</div>
-              <div class="text-sm opacity-70" style="color: var(--text-muted);">
-                Automatically backup your data every 24 hours
-              </div>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="auto-backup-toggle" class="sr-only peer" 
-                     ${localStorage.getItem('autoBackup') === 'true' ? 'checked' : ''}>
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer 
-                          peer-checked:after:translate-x-full peer-checked:after:border-white 
-                          after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
-                          after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
-                          peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Backups List (Hidden by default) -->
-        <div id="backups-list" class="hidden mt-6">
-          <div class="card p-4" style="background: var(--card-bg); border-radius: 12px;">
-            <h3 class="text-lg font-semibold mb-4" style="color: var(--text);">📋 Available Backups</h3>
-            <div id="backups-container" class="space-y-3">
-              <div class="text-center py-8" style="color: var(--text-muted);">
-                <div class="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent mx-auto mb-3" 
-                     style="border-color: var(--primary); border-top-color: transparent;"></div>
-                Loading backups...
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Backup management functions
-async function createBackup() {
-  try {
-    showToast('🔄 Creating backup...');
-    await backupAllDataToCloudflare();
-    
-    // Update UI
-    const lastBackupTime = document.getElementById('last-backup-time');
-    const lastBackupId = document.getElementById('last-backup-id');
-    
-    if (lastBackupTime) {
-      lastBackupTime.textContent = new Date().toLocaleString();
-    }
-    if (lastBackupId) {
-      lastBackupId.textContent = localStorage.getItem('lastBackupId') || 'No backup';
-    }
-    
-  } catch (error) {
-    console.error('Backup creation failed:', error);
-  }
-}
-
-async function loadBackups() {
-  try {
-    const backupsList = document.getElementById('backups-list');
-    const backupsContainer = document.getElementById('backups-container');
-    
-    // Show the backups section
-    backupsList.classList.remove('hidden');
-    
-    // Show loading state
-    backupsContainer.innerHTML = `
-      <div class="text-center py-8" style="color: var(--text-muted);">
-        <div class="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent mx-auto mb-3" 
-             style="border-color: var(--primary); border-top-color: transparent;"></div>
-        Loading backups...
-      </div>
-    `;
-    
-    // Fetch backups
-    const backups = await getUserBackups();
-    
-    if (backups.length === 0) {
-      backupsContainer.innerHTML = `
-        <div class="text-center py-8" style="color: var(--text-muted);">
-          <div class="text-4xl mb-3">📭</div>
-          <div>No backups found</div>
-          <div class="text-sm mt-2">Create your first backup to get started</div>
-        </div>
-      `;
-      return;
-    }
-    
-    // Render backups
-    backupsContainer.innerHTML = backups.map(backup => `
-      <div class="p-4 rounded-lg border" style="background: var(--surface); border-color: var(--border);">
-        <div class="flex items-center justify-between">
-          <div class="flex-1">
-            <div class="font-medium" style="color: var(--text);">
-              ${new Date(backup.timestamp).toLocaleString()}
-            </div>
-            <div class="text-sm opacity-70" style="color: var(--text-muted);">
-              Size: ${(backup.size / 1024).toFixed(1)} KB • ID: ${backup.id.slice(-8)}
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <button onclick="restoreFromBackup('${backup.id}')" 
-                    class="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
-                    style="background: var(--success); color: white;">
-              🔄 Restore
-            </button>
-            <button onclick="deleteBackupById('${backup.id}')" 
-                    class="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
-                    style="background: var(--danger); color: white;">
-              🗑️ Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    `).join('');
-    
-  } catch (error) {
-    console.error('Load backups failed:', error);
-    const backupsContainer = document.getElementById('backups-container');
-    if (backupsContainer) {
-      backupsContainer.innerHTML = `
-        <div class="text-center py-8" style="color: var(--text-muted);">
-          <div class="text-4xl mb-3">❌</div>
-          <div>Failed to load backups</div>
-          <div class="text-sm mt-2">${error.message}</div>
-        </div>
-      `;
-    }
-  }
-}
-
-async function restoreFromBackup(backupId) {
-  if (!confirm('⚠️ This will replace all your current data with the selected backup. Are you sure?')) {
-    return;
-  }
-  
-  try {
-    await restoreAllDataFromCloudflare(backupId);
-    
-    // Update UI
-    const lastBackupTime = document.getElementById('last-backup-time');
-    const lastBackupId = document.getElementById('last-backup-id');
-    
-    if (lastBackupTime) {
-      lastBackupTime.textContent = new Date().toLocaleString();
-    }
-    if (lastBackupId) {
-      lastBackupId.textContent = backupId;
-    }
-    
-  } catch (error) {
-    console.error('Restore failed:', error);
-  }
-}
-
-async function deleteBackupById(backupId) {
-  if (!confirm('🗑️ Are you sure you want to delete this backup? This action cannot be undone.')) {
-    return;
-  }
-  
-  try {
-    await deleteBackup(backupId);
-    await loadBackups(); // Refresh the list
-  } catch (error) {
-    console.error('Delete backup failed:', error);
-  }
-}
-
-// Auto-backup toggle handler
-document.addEventListener('change', (e) => {
-  if (e.target.id === 'auto-backup-toggle') {
-    localStorage.setItem('autoBackup', e.target.checked);
-    if (e.target.checked) {
-      showToast('✅ Auto-backup enabled');
-      autoBackup(); // Try to backup immediately
-    } else {
-      showToast('❌ Auto-backup disabled');
-    }
-  }
-});
-
-// Trigger auto-backup on app load if enabled
-if (localStorage.getItem('autoBackup') === 'true') {
-  setTimeout(autoBackup, 5000); // Wait 5 seconds after app loads
-}
 
 function renderQuizResultView() {
   const primary = config.primary_color;
@@ -10091,11 +8190,8 @@ window.addEventListener("appinstalled", () => {
 });
 
 
-if ("serviceWorker" in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    // Initialize cross-device support first
-    initializeCrossDeviceSupport();
-    
     navigator.serviceWorker.register("./service-worker.js")
       .then(registration => {
         console.log("Service Worker registered successfully:", registration.scope);

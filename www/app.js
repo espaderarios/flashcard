@@ -989,36 +989,98 @@ const COLOR_PALETTES = {
 
 
 const BUILT_IN_SETS = {
-circuits: {
-  subject: {
-    name: "Circuits",
-    icon: "⚡"
+  circuits: {
+    subject: { name: "Circuits", icon: "⚡" },
+    set: { name: "Circuit Analysis", description: "Learn to analyze and solve electrical circuits" },
+    cards: [
+      {
+        question: "Analyze this series circuit and find the total resistance:",
+        questionImage: "CircuitsImg/CircuitsQ1.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub><mi>i</mi><mn>1</mn></msub>
+  <mo>=</mo>
+  <mn>9</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>i</mi><mn>2</mn></msub>
+  <mo>=</mo>
+  <mn>2.5</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>i</mi><mn>3</mn></msub>
+  <mo>=</mo>
+  <mn>2</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA1.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+      {
+        question: "Calculate the current through this parallel circuit:",
+        questionImage: "CircuitsImg/CircuitsQ2.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <msub><mi>I</mi><mn>1</mn></msub>
+  <mo>=</mo>
+  <mo>&#x2212;</mo>
+  <mn>3</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>I</mi><mn>2</mn></msub>
+  <mo>=</mo>
+  <mo>&#x2212;</mo>
+  <mn>2</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+  <mspace width="1em"/>
+  <msub><mi>I</mi><mn>3</mn></msub>
+  <mo>=</mo>
+  <mn>0</mn>
+  <mtext>&#xA0;</mtext>
+  <mi>A</mi>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA2.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      },
+      {
+        question: "Find the voltage across each resistor in this circuit:",
+        questionImage: "CircuitsImg/CircuitsQ3.jpeg",
+        answer: {
+          mathml: `
+<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+  <mtable columnalign="right left right left right left" rowspacing="3pt" columnspacing="0em 2em 0em 2em 0em 2em" displaystyle="true">
+    <mtr>
+      <mtd><msub><mi>I</mi><mn>1</mn></msub></mtd>
+      <mtd>= 7.403 <mi>A</mi></mtd>
+    </mtr>
+    <mtr>
+      <mtd><msub><mi>I</mi><mn>2</mn></msub></mtd>
+      <mtd>= 1.26 <mi>A</mi></mtd>
+    </mtr>
+    <mtr>
+      <mtd><msub><mi>I</mi><mn>3</mn></msub></mtd>
+      <mtd>= 5.97 <mi>A</mi></mtd>
+    </mtr>
+  </mtable>
+</math>
+`,
+        },
+        answerImage: "CircuitsImg/CircuitsA3.jpeg",
+        imageCredit: "Mondal, M. (n.d.). Solved problems on super mesh analysis. https://www.engineeringdevotion.com/electric-circuits/solved-problems/super-mesh-analysis.html"
+      }
+    ]
   },
-  set: {
-    name: "Circuit Analysis",
-    description: "Learn to analyze and solve electrical circuits"
-  },
-  cards: [
-    {
-      question: "Analyze this series circuit and find the total resistance:",
-      questionImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk3OTdhNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkNpcmN1aXQgRG9jdW1lbnQ8L3RleHQ+Cjwvc3ZnPg==",
-      answer: "Total resistance = R1 + R2 + R3 = 2Ω + 4Ω + 6Ω = 12Ω",
-      answerImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWNmYWRmIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzE2YTQ1YSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlNvbHV0aW9uOiAxMjbCqDwvdGV4dD4KPC9zdmc+"
-    },
-    {
-      question: "Calculate the current through this parallel circuit:",
-      questionImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk3OTdhNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlBhcmFsbGVsIENpcmN1aXQ8L3RleHQ+Cjwvc3ZnPg==",
-      answer: "Total resistance = 1/(1/R1 + 1/R2 + 1/R3) = 1/(1/6 + 1/3 + 1/2) = 1Ω. Current = V/R = 12V/1Ω = 12A",
-      answerImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWNmYWRmIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzE2YTQ1YSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkkgPSAxMkE8L3RleHQ+Cjwvc3ZnPg=="
-    },
-    {
-      question: "Find the voltage across each resistor in this circuit:",
-      questionImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk3OTdhNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlZvbHRhZ2UgRGl2aWRlcjwvdGV4dD4KPC9zdmc+",
-      answer: "V1 = (R1/(R1+R2))×V = (2/(2+4))×10V = 3.33V, V2 = (R2/(R1+R2))×V = (4/(2+4))×10V = 6.67V",
-      answerImage: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWNmYWRmIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzE2YTQ1YSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlYxID0gMy4zM1YsIFYyID0gNi42N1Y8L3RleHQ+Cjwvc3ZnPg=="
-    }
-  ]
-},
 
 math: {
   subject: {
@@ -1551,11 +1613,11 @@ function renderBrowseCardsView() {
           <div class="font-medium text-text mb-2">
             ${card.question}
           </div>
-          ${card.questionImage ? `<img src="${card.questionImage}" alt="Question diagram" class="w-full max-w-sm rounded-lg mb-3 border" onerror="this.style.display='none'">` : ''}
+          ${card.questionImage ? `<img src="${card.questionImage}" alt="Question diagram" class="w-full max-w-xl rounded-lg mb-3 border" onerror="this.style.display='none'">` : ''}
           <div class="text-text-muted text-sm">
             ${card.answer}
           </div>
-          ${card.answerImage ? `<img src="${card.answerImage}" alt="Answer solution" class="w-full max-w-sm rounded-lg mt-2 border" onerror="this.style.display='none'">` : ''}
+          ${card.answerImage ? `<img src="${card.answerImage}" alt="Answer solution" class="w-full max-w-xl rounded-lg mt-2 border" onerror="this.style.display='none'">` : ''}
         </div>
       </div>
     </div>
@@ -1622,6 +1684,8 @@ function renderBrowseStudyView() {
 
   return `
     <div class="p-6 max-w-lg mx-auto fade-in">
+
+      <!-- Back button & progress -->
       <div class="mb-6">
         <button class="btn-secondary mb-4" onclick="backToBrowseCards()">
           ← Back to Cards
@@ -1636,7 +1700,8 @@ function renderBrowseStudyView() {
         </div>
       </div>
 
-      <div class="card-study p-8 rounded-xl text-center mb-6"
+      <!-- Flashcard image -->
+      <div class="card-study p-0 rounded-xl text-center mb-4"
            style="background: var(--card-bg); perspective: 1000px; box-shadow: var(--shadow-lg);">
 
         <div class="card-inner ${isBrowseCardFlipped ? 'flipped' : ''}"
@@ -1647,41 +1712,60 @@ function renderBrowseStudyView() {
                cursor: pointer;
                position: relative;
                width: 100%;
-               min-height: 200px;
+               min-height: 260px;
                border-radius: var(--radius);
              ">
 
-          <div class="card-front absolute inset-0 flex items-center justify-center p-6 rounded-xl"
-               style="backface-visibility: hidden; background: var(--card-bg);">
-            <div class="text-center">
-              <div class="text-primary text-2xl mb-4">❓</div>
-              <h3 class="font-semibold text-xl text-text mb-4">Question</h3>
-              <p class="text-text text-lg leading-relaxed mb-4">${card.question}</p>
-              ${card.questionImage ? `<img src="${card.questionImage}" alt="Question diagram" class="w-full max-w-xs rounded-lg border mx-auto" onerror="this.style.display='none'">` : ''}
-            </div>
+          <!-- FRONT -->
+          <div class="card-front absolute inset-0 rounded-xl overflow-hidden"
+               style="backface-visibility: hidden;">
+            <img src="${card.questionImage || ''}"
+                 class="w-full h-full object-contain"
+                 alt="Question image">
           </div>
 
-          <div class="card-back absolute inset-0 flex items-center justify-center p-6 rounded-xl"
-               style="
-                 backface-visibility: hidden;
-                 transform: rotateY(180deg);
-                 background: var(--card-bg);
-               ">
-            <div class="text-center">
-              <div class="text-success text-2xl mb-4">✅</div>
-              <h3 class="font-semibold text-xl text-text mb-4">Answer</h3>
-              <p class="text-text text-lg leading-relaxed mb-4">${card.answer}</p>
-              ${card.answerImage ? `<img src="${card.answerImage}" alt="Answer solution" class="w-full max-w-xs rounded-lg border mx-auto" onerror="this.style.display='none'">` : ''}
-            </div>
+          <!-- BACK -->
+          <div class="card-back absolute inset-0 rounded-xl overflow-hidden"
+               style="backface-visibility: hidden; transform: rotateY(180deg);">
+            <img src="${card.answerImage || ''}"
+                 class="w-full h-full object-contain"
+                 alt="Answer image">
           </div>
 
         </div>
       </div>
 
+<!-- Question / Answer below the flashcard -->
+<div class="text-center mb-4 p-4 bg-white rounded-xl shadow">
+  <div class="text-lg font-semibold mb-2">
+    ${isBrowseCardFlipped ? 'Answer' : 'Question'}
+  </div>
+  <p class="text-text leading-relaxed mb-2">
+    ${isBrowseCardFlipped ? card.answer?.text || '' : card.question}
+  </p>
+
+  <!-- MathML only if flipped -->
+  ${isBrowseCardFlipped ? `
+    <div id="answerMath" class="text-lg leading-relaxed">
+      ${card.answer?.mathml || ''}
+    </div>
+  ` : ''}
+
+  <!-- Image credits -->
+${card.imageCredit ? `
+  <div class="mt-1 text-right text-text-muted" style="font-size: 10px;">
+    Image credit: ${card.imageCredit}
+  </div>
+` : ''}
+</div>
+
+
+      <!-- Tap hint -->
       <div class="text-center mb-4">
         <p class="text-text-muted">Tap the card to ${isBrowseCardFlipped ? 'see question' : 'reveal answer'}</p>
       </div>
 
+      <!-- Navigation -->
       <div class="flex justify-between gap-4">
         <button onclick="prevBrowseCard()"
                 class="btn-secondary flex-1 py-3 ${currentBrowseCardIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
@@ -1714,9 +1798,11 @@ function renderBrowseStudyView() {
           opacity: 1;
         }
       </style>
+
     </div>
   `;
 }
+
 
 // ---------- Flip Card ----------
 function flipBrowseCard() {
@@ -5996,8 +6082,22 @@ function renderApp() {
     app.innerHTML += renderBottomNav();
   }
 
-}
+  if (currentView === "browse-study") {
+    setTimeout(() => {
+     const card = currentBrowseSetCards[currentBrowseCardIndex];
+      const answerEl = document.getElementById("answerMath");
 
+      if (answerEl && card?.answer?.mathml) {
+       answerEl.innerHTML = card.answer.mathml;
+
+       // Optional MathJax support
+       if (window.MathJax) {
+         MathJax.typesetPromise([answerEl]);
+       }
+      }
+    }, 0);
+  }
+}
 
 function renderSubjectsView() {
   const subjects = getSubjects();
